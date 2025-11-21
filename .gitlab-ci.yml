@@ -1,0 +1,93 @@
+stages:
+  - validate
+  - plan
+  - apply
+
+variables:
+  TF_ROOT: ${CI_PROJECT_DIR}/landing-zones/aws/environments
+  AWS_DEFAULT_REGION: us-east-1
+  TF_IN_AUTOMATION: "true"
+  # AWS_ROLE_ARN must be set in CI/CD Variables
+
+.terraform:
+  image: hashicorp/terraform:latest
+  id_tokens:
+    AWS_JWT:
+      aud: https://gitlab.com
+  before_script:
+    - apk add --no-cache aws-cli jq
+    - echo "$AWS_JWT" > /tmp/web_identity_token
+    - |
+      CREDENTIALS=$(aws sts assume-role-with-web-identity \
+        --role-arn $AWS_ROLE_ARN \
+        --role-session-name "GitLabRunner-${CI_PROJECT_ID}-${CI_PIPELINE_ID}" \
+        --web-identity-token "$AWS_JWT" \
+        --duration-seconds 3600 \
+        --output json)
+    - export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId')
+    - export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey')
+    - export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r '.Credentials.SessionToken')
+    - cd $TF_ROOT/$ENV_DIR
+    - terraform init
+
+validate:
+  extends: .terraform
+  stage: validate
+  script:
+    - terraform validate
+  parallel:
+    matrix:
+      - ENV_DIR: [shared-account, dev-app-account, prod-app-account]
+
+.plan:
+  extends: .terraform
+  stage: plan
+  script:
+    - terraform plan -out=tfplan
+  artifacts:
+    paths:
+      - $TF_ROOT/$ENV_DIR/tfplan
+    expire_in: 1 week
+
+.apply:
+  extends: .terraform
+  stage: apply
+  script:
+    - terraform apply -auto-approve tfplan
+  when: manual
+
+# Shared Account
+shared-plan:
+  extends: .plan
+  variables:
+    ENV_DIR: shared-account
+
+shared-apply:
+  extends: .apply
+  variables:
+    ENV_DIR: shared-account
+  needs: ["shared-plan"]
+
+# Dev Account
+dev-plan:
+  extends: .plan
+  variables:
+    ENV_DIR: dev-app-account
+
+dev-apply:
+  extends: .apply
+  variables:
+    ENV_DIR: dev-app-account
+  needs: ["dev-plan"]
+
+# Prod Account
+prod-plan:
+  extends: .plan
+  variables:
+    ENV_DIR: prod-app-account
+
+prod-apply:
+  extends: .apply
+  variables:
+    ENV_DIR: prod-app-account
+  needs: ["prod-plan"]

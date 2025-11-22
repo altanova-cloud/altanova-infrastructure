@@ -28,7 +28,12 @@ variables:
       --output text)
     - export $(printf "AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s AWS_SESSION_TOKEN=%s" $aws_sts_output)
     - cd ${TF_ROOT}/${ENV_DIR}
-    - terraform init
+    - |
+      if [ -f backend.conf ]; then
+        terraform init -backend-config=backend.conf
+      else
+        terraform init
+      fi
 
 validate:
   extends: .terraform

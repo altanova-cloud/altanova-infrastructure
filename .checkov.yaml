@@ -1,0 +1,29 @@
+# Checkov Configuration
+# https://www.checkov.io/2.Basics/CLI%20Command%20Reference.html
+
+# Skip specific checks with justification
+skip-check:
+  # CKV_AWS_18: S3 bucket should have access logging configured
+  # Justification: State bucket doesn't need access logging for cost reasons
+  - CKV_AWS_18
+  
+  # CKV_AWS_21: S3 bucket should have versioning enabled
+  # Justification: Already enabled via separate resource
+  - CKV_AWS_21
+
+# Frameworks to scan
+framework:
+  - terraform
+
+# Output formats
+output:
+  - cli
+  - json
+  - gitlab_sast
+
+# Soft fail mode (don't fail pipeline on findings)
+soft-fail: false
+
+# Severity threshold (fail on HIGH and CRITICAL only)
+# Options: CRITICAL, HIGH, MEDIUM, LOW
+check-severity: HIGH

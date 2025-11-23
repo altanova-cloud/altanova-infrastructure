@@ -1,13 +1,26 @@
 stages:
+  - security
   - validate
   - plan
+  - cost
+  - approve
   - apply
+
+# Workflow rules - only run on MRs and master
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "master"
+    - when: never
 
 variables:
   TF_ROOT: ${CI_PROJECT_DIR}/aws/environments
   AWS_DEFAULT_REGION: us-east-1
   TF_IN_AUTOMATION: "true"
-  # AWS_ROLE_ARN must be set in CI/CD Variables
+  # Required CI/CD Variables:
+  # - AWS_ROLE_ARN: GitLab Runner IAM Role ARN
+  # - GITLAB_TOKEN: For posting MR comments (optional)
+  # - INFRACOST_API_KEY: For cost estimation (optional)
 
 .terraform:
   image:
@@ -35,64 +48,158 @@ variables:
         terraform init
       fi
 
+# Security Stage
+checkov-scan:
+  stage: security
+  image: bridgecrew/checkov:latest
+  script:
+    - checkov -d aws/ --framework terraform --output cli --output json --output gitlab_sast
+  artifacts:
+    reports:
+      sast: results_sast.json
+    expire_in: 30 days
+  allow_failure: false
+
+tfsec-scan:
+  stage: security
+  image: aquasec/tfsec:latest
+  script:
+    - tfsec aws/ --format json --format sarif --out tfsec-report.sarif
+  artifacts:
+    reports:
+      sast: tfsec-report.sarif
+    expire_in: 30 days
+  allow_failure: false
+
+# Validation Stage
 validate:
   extends: .terraform
   stage: validate
   script:
+    - terraform fmt -check -recursive
     - terraform validate
   parallel:
     matrix:
       - ENV_DIR: [shared-account, dev-app-account, prod-app-account]
 
+# Plan Stage
 .plan:
   extends: .terraform
   stage: plan
   script:
-    - terraform plan -out=tfplan
+    - terraform plan -out=tfplan | tee plan.txt
+    - terraform show -no-color tfplan > plan-readable.txt
+  after_script:
+    - |
+      if [ "$CI_PIPELINE_SOURCE" == "merge_request_event" ] && [ -n "$GITLAB_TOKEN" ]; then
+        PLAN_SUMMARY=$(cat plan-readable.txt | head -100)
+        curl --request POST \
+          --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+          --data "body=### Terraform Plan: ${ENV_DIR}\n\`\`\`\n${PLAN_SUMMARY}\n\`\`\`" \
+          "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes" || true
+      fi
   artifacts:
     paths:
       - $TF_ROOT/$ENV_DIR/tfplan
-    expire_in: 1 week
+      - $TF_ROOT/$ENV_DIR/plan-readable.txt
+    expire_in: 7 days
 
+# Cost Estimation Stage
+infracost:
+  stage: cost
+  image: infracost/infracost:latest
+  variables:
+    ENV_DIR: shared-account
+  script:
+    - cd ${TF_ROOT}/${ENV_DIR}
+    - infracost breakdown --path . --format json --out-file /tmp/infracost.json || echo "Infracost failed"
+  artifacts:
+    paths:
+      - /tmp/infracost.json
+    expire_in: 30 days
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  allow_failure: true
+
+# Approval Stage (runs on master only)
+.approve:
+  stage: approve
+  script:
+    - echo "Reviewing plan for ${ENV_DIR}"
+    - cat ${TF_ROOT}/${ENV_DIR}/plan-readable.txt || echo "No plan file found"
+  when: manual
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+
+# Apply Stage (runs on master only after approval)
 .apply:
   extends: .terraform
   stage: apply
   script:
     - terraform apply -auto-approve tfplan
-  when: manual
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: on_success
 
-# Shared Account
+# Shared Account Jobs
 shared-plan:
   extends: .plan
   variables:
     ENV_DIR: shared-account
 
-shared-apply:
-  extends: .apply
+shared-approve:
+  extends: .approve
   variables:
     ENV_DIR: shared-account
   needs: ["shared-plan"]
 
-# Dev Account
+shared-apply:
+  extends: .apply
+  variables:
+    ENV_DIR: shared-account
+  environment:
+    name: shared-account
+    action: start
+  needs: ["shared-approve"]
+
+# Dev Account Jobs
 dev-plan:
   extends: .plan
   variables:
     ENV_DIR: dev-app-account
 
-dev-apply:
-  extends: .apply
+dev-approve:
+  extends: .approve
   variables:
     ENV_DIR: dev-app-account
   needs: ["dev-plan"]
 
-# Prod Account
+dev-apply:
+  extends: .apply
+  variables:
+    ENV_DIR: dev-app-account
+  environment:
+    name: dev-app-account
+    action: start
+  needs: ["dev-approve"]
+
+# Prod Account Jobs
 prod-plan:
   extends: .plan
   variables:
     ENV_DIR: prod-app-account
 
+prod-approve:
+  extends: .approve
+  variables:
+    ENV_DIR: prod-app-account
+  needs: ["prod-plan"]
+
 prod-apply:
   extends: .apply
   variables:
     ENV_DIR: prod-app-account
-  needs: ["prod-plan"]
+  environment:
+    name: prod-app-account
+    action: start
+  needs: ["prod-approve"]

@@ -1,0 +1,23 @@
+# tfsec Configuration
+# https://aquasecurity.github.io/tfsec/latest/guides/configuration/config/
+
+# Severity threshold
+minimum-severity: HIGH
+
+# Exclude specific checks
+exclude:
+  # AWS018: S3 Bucket should have access logging configured
+  - AWS018
+
+# Custom checks directory (optional)
+# custom-check-dir: .tfsec
+
+# Output formats
+format: 
+  - default
+  - json
+  - sarif
+
+# Ignore specific resources (example)
+# exclude-paths:
+#   - .terraform/**

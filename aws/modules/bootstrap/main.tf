@@ -134,9 +134,46 @@ resource "aws_iam_role" "gitlab_runner" {
   })
 }
 
-resource "aws_iam_role_policy_attachment" "gitlab_runner_admin" {
-  role       = aws_iam_role.gitlab_runner.name
-  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess" # Adjust as needed for least privilege
+# Policy to assume roles in other accounts
+resource "aws_iam_role_policy" "gitlab_runner_assume_role" {
+  name = "AssumeDeploymentRoles"
+  role = aws_iam_role.gitlab_runner.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = "sts:AssumeRole"
+        Resource = [
+          "arn:aws:iam::${var.dev_account_id}:role/DevDeployRole",
+          "arn:aws:iam::${var.prod_account_id}:role/ProdDeployRole"
+        ]
+      }
+    ]
+  })
+}
+
+# Scoped permissions for Shared Account deployments
+resource "aws_iam_role_policy" "gitlab_runner_shared" {
+  name = "SharedAccountDeployment"
+  role = aws_iam_role.gitlab_runner.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:*",
+          "dynamodb:*",
+          "iam:*",
+          "sts:*"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
 }
 
 data "aws_caller_identity" "current" {}

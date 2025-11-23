@@ -19,6 +19,8 @@ variables:
   TF_IN_AUTOMATION: "true"
   # Required CI/CD Variables:
   # - AWS_ROLE_ARN: GitLab Runner IAM Role ARN
+  # - DEV_DEPLOY_ROLE_ARN: Dev deployment role ARN (optional)
+  # - PROD_DEPLOY_ROLE_ARN: Prod deployment role ARN (optional)
   # - GITLAB_TOKEN: For posting MR comments (optional)
   # - INFRACOST_API_KEY: For cost estimation (optional)
 
@@ -40,6 +42,46 @@ variables:
       --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]'
       --output text)
     - export $(printf "AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s AWS_SESSION_TOKEN=%s" $aws_sts_output)
+    - cd ${TF_ROOT}/${ENV_DIR}
+    - |
+      if [ -f backend.conf ]; then
+        terraform init -backend-config=backend.conf
+      else
+        terraform init
+      fi
+
+# Template for jobs that need to assume environment-specific deployment roles
+.assume_deploy_role:
+  image:
+    name: hashicorp/terraform:latest
+    entrypoint: [""]
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: https://gitlab.com
+  before_script:
+    - apk add --no-cache aws-cli jq
+    # Step 1: Assume GitLabRunnerRole via OIDC
+    - >
+      aws_sts_output=$(aws sts assume-role-with-web-identity
+      --role-arn ${AWS_ROLE_ARN}
+      --role-session-name "GitLabRunner-${CI_PROJECT_ID}-${CI_PIPELINE_ID}"
+      --web-identity-token ${GITLAB_OIDC_TOKEN}
+      --duration-seconds 3600
+      --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]'
+      --output text)
+    - export $(printf "AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s AWS_SESSION_TOKEN=%s" $aws_sts_output)
+    # Step 2: Assume environment-specific deployment role
+    - |
+      if [ -n "$DEPLOY_ROLE_ARN" ]; then
+        echo "Assuming deployment role: $DEPLOY_ROLE_ARN"
+        deploy_creds=$(aws sts assume-role \
+          --role-arn $DEPLOY_ROLE_ARN \
+          --role-session-name "Deploy-${ENV_DIR}-${CI_PIPELINE_ID}" \
+          --duration-seconds 3600 \
+          --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+          --output text)
+        export $(printf "AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s AWS_SESSION_TOKEN=%s" $deploy_creds)
+      fi
     - cd ${TF_ROOT}/${ENV_DIR}
     - |
       if [ -f backend.conf ]; then
@@ -162,11 +204,30 @@ shared-apply:
     action: start
   needs: ["shared-approve"]
 
-# Dev Account Jobs
+# Dev Account Jobs - Uses role assumption
 dev-plan:
-  extends: .plan
+  extends: .assume_deploy_role
+  stage: plan
   variables:
     ENV_DIR: dev-app-account
+    DEPLOY_ROLE_ARN: $DEV_DEPLOY_ROLE_ARN
+  script:
+    - terraform plan -out=tfplan | tee plan.txt
+    - terraform show -no-color tfplan > plan-readable.txt
+  after_script:
+    - |
+      if [ "$CI_PIPELINE_SOURCE" == "merge_request_event" ] && [ -n "$GITLAB_TOKEN" ]; then
+        PLAN_SUMMARY=$(cat plan-readable.txt | head -100)
+        curl --request POST \
+          --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+          --data "body=### Terraform Plan: ${ENV_DIR}\n\`\`\`\n${PLAN_SUMMARY}\n\`\`\`" \
+          "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes" || true
+      fi
+  artifacts:
+    paths:
+      - $TF_ROOT/$ENV_DIR/tfplan
+      - $TF_ROOT/$ENV_DIR/plan-readable.txt
+    expire_in: 7 days
 
 dev-approve:
   extends: .approve
@@ -183,11 +244,30 @@ dev-apply:
     action: start
   needs: ["dev-approve"]
 
-# Prod Account Jobs
+# Prod Account Jobs - Uses role assumption
 prod-plan:
-  extends: .plan
+  extends: .assume_deploy_role
+  stage: plan
   variables:
     ENV_DIR: prod-app-account
+    DEPLOY_ROLE_ARN: $PROD_DEPLOY_ROLE_ARN
+  script:
+    - terraform plan -out=tfplan | tee plan.txt
+    - terraform show -no-color tfplan > plan-readable.txt
+  after_script:
+    - |
+      if [ "$CI_PIPELINE_SOURCE" == "merge_request_event" ] && [ -n "$GITLAB_TOKEN" ]; then
+        PLAN_SUMMARY=$(cat plan-readable.txt | head -100)
+        curl --request POST \
+          --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+          --data "body=### Terraform Plan: ${ENV_DIR}\n\`\`\`\n${PLAN_SUMMARY}\n\`\`\`" \
+          "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes" || true
+      fi
+  artifacts:
+    paths:
+      - $TF_ROOT/$ENV_DIR/tfplan
+      - $TF_ROOT/$ENV_DIR/plan-readable.txt
+    expire_in: 7 days
 
 prod-approve:
   extends: .approve

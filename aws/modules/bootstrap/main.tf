@@ -1,3 +1,7 @@
+# Data Sources
+data "aws_caller_identity" "current" {}
+
+# S3 Bucket for Terraform State
 resource "aws_s3_bucket" "terraform_state" {
   bucket = var.bucket_name
 
@@ -176,4 +180,5 @@ resource "aws_iam_role_policy" "gitlab_runner_shared" {
   })
 }
 
-data "aws_caller_identity" "current" {}
+  })
+}

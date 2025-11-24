@@ -203,7 +203,11 @@ shared-approve:
   extends: .approve
   variables:
     ENV_DIR: shared-account
-  needs: ["shared-plan"]
+  needs:
+    - job: shared-plan
+      artifacts: true
+  dependencies:
+    - shared-plan
 
 shared-apply:
   extends: .apply
@@ -212,7 +216,11 @@ shared-apply:
   environment:
     name: shared-account
     action: start
-  needs: ["shared-approve"]
+  needs:
+    - job: shared-approve
+      artifacts: true
+  dependencies:
+    - shared-plan
 
 # Dev Account Jobs - Uses role assumption
 dev-plan:
@@ -244,7 +252,11 @@ dev-approve:
   extends: .approve
   variables:
     ENV_DIR: dev-app-account
-  needs: ["dev-plan"]
+  needs:
+    - job: dev-plan
+      artifacts: true
+  dependencies:
+    - dev-plan
 
 dev-apply:
   extends: .apply
@@ -253,7 +265,11 @@ dev-apply:
   environment:
     name: dev-app-account
     action: start
-  needs: ["dev-approve"]
+  needs:
+    - job: dev-approve
+      artifacts: true
+  dependencies:
+    - dev-plan
 
 # Prod Account Jobs - Uses role assumption
 prod-plan:
@@ -285,7 +301,11 @@ prod-approve:
   extends: .approve
   variables:
     ENV_DIR: prod-app-account
-  needs: ["prod-plan"]
+  needs:
+    - job: prod-plan
+      artifacts: true
+  dependencies:
+    - prod-plan
 
 prod-apply:
   extends: .apply
@@ -294,4 +314,8 @@ prod-apply:
   environment:
     name: prod-app-account
     action: start
-  needs: ["prod-approve"]
+  needs:
+    - job: prod-approve
+      artifacts: true
+  dependencies:
+    - prod-plan

@@ -1,7 +1,7 @@
 resource "aws_iam_role" "deployment" {
   name = "${title(var.environment)}DeployRole"
 
-  assume_role_policy = jsonencode({
+  assume_role_policy = var.environment == "prod" ? jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
@@ -10,12 +10,22 @@ resource "aws_iam_role" "deployment" {
           AWS = var.gitlab_runner_role_arn
         }
         Action = "sts:AssumeRole"
-        # Add external ID for production for extra security
-        Condition = var.environment == "prod" ? {
+        Condition = {
           StringEquals = {
             "sts:ExternalId" = "production-deployment"
           }
-        } : null
+        }
+      }
+    ]
+  }) : jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          AWS = var.gitlab_runner_role_arn
+        }
+        Action = "sts:AssumeRole"
       }
     ]
   })

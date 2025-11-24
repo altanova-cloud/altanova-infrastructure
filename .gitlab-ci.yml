@@ -93,7 +93,9 @@ variables:
 # Security Stage
 checkov-scan:
   stage: security
-  image: bridgecrew/checkov:latest
+  image:
+    name: bridgecrew/checkov:latest
+    entrypoint: [""]
   script:
     - checkov -d aws/ --framework terraform --output cli --output json --output gitlab_sast
   artifacts:
@@ -104,7 +106,9 @@ checkov-scan:
 
 tfsec-scan:
   stage: security
-  image: aquasec/tfsec:latest
+  image:
+    name: aquasec/tfsec:latest
+    entrypoint: [""]
   script:
     - tfsec aws/ --format json --format sarif --out tfsec-report.sarif
   artifacts:

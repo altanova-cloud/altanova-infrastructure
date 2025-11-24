@@ -94,10 +94,10 @@ variables:
 checkov-scan:
   stage: security
   image:
-    name: bridgecrew/checkov:latest
+    name: bridgecrew/checkov:3.2.291
     entrypoint: [""]
   script:
-    - checkov -d aws/ --config-file .checkov.yaml
+    - checkov -d aws/ --config-file .checkov.yaml --output-file-path console,results_sast.json
   artifacts:
     reports:
       sast: results_sast.json
@@ -108,15 +108,13 @@ checkov-scan:
 tfsec-scan:
   stage: security
   image:
-    name: aquasec/tfsec:latest
+    name: aquasec/tfsec:v1.28
     entrypoint: [""]
   script:
-    - tfsec aws/ --format sarif --out tfsec-report.sarif || true
+    - tfsec aws/ --format sarif --out tfsec-report.sarif --no-color || true
   artifacts:
     reports:
       sast: tfsec-report.sarif
-    paths:
-      - tfsec-report.sarif
     expire_in: 30 days
     when: always
   allow_failure: true

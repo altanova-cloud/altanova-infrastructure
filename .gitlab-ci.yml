@@ -91,10 +91,11 @@ variables:
       fi
 
 # Security Stage
+# Note: Review scanner versions quarterly for updates
 checkov-scan:
   stage: security
   image:
-    name: bridgecrew/checkov:3.2.291
+    name: bridgecrew/checkov:3  # Major version 3.x - compatible with GitLab 15.x SAST
     entrypoint: [""]
   script:
     - checkov -d aws/ --config-file .checkov.yaml --output-file-path console,results_sast.json
@@ -108,7 +109,7 @@ checkov-scan:
 tfsec-scan:
   stage: security
   image:
-    name: aquasec/tfsec:v1.28
+    name: aquasec/tfsec:v1  # Major version 1.x
     entrypoint: [""]
   script:
     - tfsec aws/ --format sarif --out tfsec-report.sarif --no-color || true

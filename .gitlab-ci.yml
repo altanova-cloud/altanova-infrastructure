@@ -123,13 +123,15 @@ checkov-scan:
 tfsec-scan:
   stage: security
   image:
-    name: aquasec/tfsec:v1  # Major version 1.x
+    name: aquasec/tfsec:latest
     entrypoint: [""]
   script:
     - tfsec aws/ --format sarif --out tfsec-report.sarif --no-color || true
   artifacts:
     reports:
       sast: tfsec-report.sarif
+    paths:
+      - tfsec-report.sarif
     expire_in: 30 days
     when: always
   allow_failure: true

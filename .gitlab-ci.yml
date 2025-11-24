@@ -142,6 +142,7 @@ validate:
   after_script:
     - |
       if [ "$CI_PIPELINE_SOURCE" == "merge_request_event" ] && [ -n "$GITLAB_TOKEN" ]; then
+        cd ${TF_ROOT}/${ENV_DIR}
         PLAN_SUMMARY=$(cat plan-readable.txt | head -100)
         curl --request POST \
           --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
@@ -150,8 +151,8 @@ validate:
       fi
   artifacts:
     paths:
-      - $TF_ROOT/$ENV_DIR/tfplan
-      - $TF_ROOT/$ENV_DIR/plan-readable.txt
+      - aws/environments/*/tfplan
+      - aws/environments/*/plan-readable.txt
     expire_in: 7 days
 
 # Cost Estimation Stage
@@ -176,7 +177,8 @@ infracost:
   stage: approve
   script:
     - echo "Reviewing plan for ${ENV_DIR}"
-    - cat ${TF_ROOT}/${ENV_DIR}/plan-readable.txt || echo "No plan file found"
+    - cd ${TF_ROOT}/${ENV_DIR}
+    - cat plan-readable.txt || echo "No plan file found"
   when: manual
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
@@ -225,6 +227,7 @@ dev-plan:
   after_script:
     - |
       if [ "$CI_PIPELINE_SOURCE" == "merge_request_event" ] && [ -n "$GITLAB_TOKEN" ]; then
+        cd ${TF_ROOT}/${ENV_DIR}
         PLAN_SUMMARY=$(cat plan-readable.txt | head -100)
         curl --request POST \
           --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
@@ -233,8 +236,8 @@ dev-plan:
       fi
   artifacts:
     paths:
-      - $TF_ROOT/$ENV_DIR/tfplan
-      - $TF_ROOT/$ENV_DIR/plan-readable.txt
+      - aws/environments/*/tfplan
+      - aws/environments/*/plan-readable.txt
     expire_in: 7 days
 
 dev-approve:
@@ -265,6 +268,7 @@ prod-plan:
   after_script:
     - |
       if [ "$CI_PIPELINE_SOURCE" == "merge_request_event" ] && [ -n "$GITLAB_TOKEN" ]; then
+        cd ${TF_ROOT}/${ENV_DIR}
         PLAN_SUMMARY=$(cat plan-readable.txt | head -100)
         curl --request POST \
           --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
@@ -273,8 +277,8 @@ prod-plan:
       fi
   artifacts:
     paths:
-      - $TF_ROOT/$ENV_DIR/tfplan
-      - $TF_ROOT/$ENV_DIR/plan-readable.txt
+      - aws/environments/*/tfplan
+      - aws/environments/*/plan-readable.txt
     expire_in: 7 days
 
 prod-approve:

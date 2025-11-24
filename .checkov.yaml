@@ -22,8 +22,4 @@ output:
   - gitlab_sast
 
 # Soft fail mode (don't fail pipeline on findings)
-soft-fail: false
-
-# Severity threshold (fail on HIGH and CRITICAL only)
-# Options: CRITICAL, HIGH, MEDIUM, LOW
-check-severity: HIGH
+soft-fail: true

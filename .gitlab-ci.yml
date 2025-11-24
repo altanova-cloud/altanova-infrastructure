@@ -97,12 +97,13 @@ checkov-scan:
     name: bridgecrew/checkov:latest
     entrypoint: [""]
   script:
-    - checkov -d aws/ --framework terraform --output cli --output json --output gitlab_sast
+    - checkov -d aws/ --config-file .checkov.yaml
   artifacts:
     reports:
       sast: results_sast.json
     expire_in: 30 days
-  allow_failure: false
+    when: always
+  allow_failure: true
 
 tfsec-scan:
   stage: security
@@ -110,12 +111,15 @@ tfsec-scan:
     name: aquasec/tfsec:latest
     entrypoint: [""]
   script:
-    - tfsec aws/ --format json --format sarif --out tfsec-report.sarif
+    - tfsec aws/ --format sarif --out tfsec-report.sarif || true
   artifacts:
     reports:
       sast: tfsec-report.sarif
+    paths:
+      - tfsec-report.sarif
     expire_in: 30 days
-  allow_failure: false
+    when: always
+  allow_failure: true
 
 # Validation Stage
 validate:

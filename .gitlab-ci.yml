@@ -217,6 +217,8 @@ shared-apply:
     name: shared-account
     action: start
   needs:
+    - job: shared-plan
+      artifacts: true
     - job: shared-approve
       artifacts: true
   dependencies:
@@ -266,6 +268,8 @@ dev-apply:
     name: dev-app-account
     action: start
   needs:
+    - job: dev-plan
+      artifacts: true
     - job: dev-approve
       artifacts: true
   dependencies:
@@ -315,6 +319,8 @@ prod-apply:
     name: prod-app-account
     action: start
   needs:
+    - job: prod-plan
+      artifacts: true
     - job: prod-approve
       artifacts: true
   dependencies:

@@ -11,7 +11,10 @@ include:
 
 variables:
   SAST_EXCLUDED_PATHS: "spec,test,tests,tmp,.terraform"
-  SAST_IaC_STAGE: security  # Override default 'test' stage to use our 'security' stage
+
+# Override the default stage from 'test' to 'security'
+iac-sast:
+  stage: security
 
 # ============================================================================
 # CUSTOM SCANNERS (COMMENTED OUT - Using GitLab template above instead)

@@ -171,6 +171,7 @@ validate:
     expire_in: 7 days
 
 # Cost Estimation Stage
+# Note: Infracost requires INFRACOST_API_KEY to be set in CI/CD variables
 infracost:
   stage: cost
   image:

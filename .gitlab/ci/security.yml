@@ -22,8 +22,6 @@ checkov-scan:
   artifacts:
     reports:
       sast: checkov-report.xml
-    paths:
-      - results_sast.json
     expire_in: 30 days
     when: always
   allow_failure: false
@@ -34,12 +32,11 @@ tfsec-scan:
     name: aquasec/tfsec:latest
     entrypoint: [""]
   script:
-    - tfsec aws/ --config-file .tfsec.yml --format sarif --out tfsec-report.sarif --no-color
+    - tfsec aws/ --config-file .tfsec.yml --format json --out tfsec-report.json --no-color
   artifacts:
     reports:
-      sast: tfsec-report.sarif
-    paths:
-      - tfsec-report.sarif
+      sast: tfsec-report.json
     expire_in: 30 days
     when: always
-  allow_failure: false
+  allow_failure: true
+

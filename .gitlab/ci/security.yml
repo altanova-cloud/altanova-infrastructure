@@ -12,9 +12,12 @@ include:
 variables:
   SAST_EXCLUDED_PATHS: "spec,test,tests,tmp,.terraform"
 
-# Override the default stage from 'test' to 'security'
+# Override the default stage and rules
 iac-sast:
   stage: security
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "master"
 
 # ============================================================================
 # CUSTOM SCANNERS (COMMENTED OUT - Using GitLab template above instead)

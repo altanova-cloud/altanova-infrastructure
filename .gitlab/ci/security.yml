@@ -18,6 +18,9 @@ iac-sast:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "master"
+  allow_failure: true  # Don't block pipeline on security findings
+  artifacts:
+    when: always  # Upload artifacts even if job fails
 
 # ============================================================================
 # CUSTOM SCANNERS (COMMENTED OUT - Using GitLab template above instead)

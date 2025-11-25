@@ -173,7 +173,9 @@ validate:
 # Cost Estimation Stage
 infracost:
   stage: cost
-  image: infracost/infracost:latest
+  image:
+    name: infracost/infracost:latest
+    entrypoint: [""]
   variables:
     ENV_DIR: shared-account
   script:

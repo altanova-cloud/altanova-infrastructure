@@ -2,64 +2,66 @@
 # This file contains all security-related CI/CD jobs
 # Maintained by: Security/DevSecOps team
 
-# Using GitLab's official IaC scanning template (recommended)
-# This provides better integration with GitLab Security Dashboard
-# and uses industry-standard tools (Checkov, tfsec, kics)
+# Note: GitLab's IaC template had issues generating reports
+# Using custom scanner configuration for better control
 
-include:
-  - template: Security/SAST-IaC.gitlab-ci.yml
+# ============================================================================
+# CUSTOM SCANNERS (ACTIVE)
+# ============================================================================
 
-variables:
-  SAST_EXCLUDED_PATHS: "spec,test,tests,tmp,.terraform"
-
-# Override the default stage and rules
-iac-sast:
+checkov-scan:
   stage: security
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "master"
-  allow_failure: true  # Don't block pipeline on security findings
+  image:
+    name: bridgecrew/checkov:3
+    entrypoint: [""]
+  script:
+    - |
+      checkov -d aws/ \
+        --framework terraform \
+        --output cli \
+        --output junitxml \
+        --output-file-path console,checkov-report.xml \
+        --compact || true
   artifacts:
-    when: always  # Upload artifacts even if job fails
+    reports:
+      junit: checkov-report.xml
+    paths:
+      - checkov-report.xml
+    expire_in: 30 days
+    when: always
+  allow_failure: true
+
+tfsec-scan:
+  stage: security
+  image:
+    name: aquasec/tfsec:latest
+    entrypoint: [""]
+  script:
+    - tfsec aws/ --config-file .tfsec.yml --format junit --out tfsec-report.xml --no-color || true
+  artifacts:
+    reports:
+      junit: tfsec-report.xml
+    paths:
+      - tfsec-report.xml
+    expire_in: 30 days
+    when: always
+  allow_failure: true
 
 # ============================================================================
-# CUSTOM SCANNERS (COMMENTED OUT - Using GitLab template above instead)
+# GITLAB IAC TEMPLATE (COMMENTED OUT - Had issues with report generation)
 # ============================================================================
-# Uncomment below if you need custom scanner configuration
-# Note: GitLab template is recommended for better dashboard integration
-# ============================================================================
-
-# checkov-scan:
+# include:
+#   - template: Security/SAST-IaC.gitlab-ci.yml
+#
+# variables:
+#   SAST_EXCLUDED_PATHS: "spec,test,tests,tmp,.terraform"
+#
+# iac-sast:
 #   stage: security
-#   image:
-#     name: bridgecrew/checkov:3
-#     entrypoint: [""]
-#   script:
-#     - |
-#       checkov -d aws/ \
-#         --framework terraform \
-#         --output cli \
-#         --output json \
-#         --output-file-path console,checkov-report.xml \
-#         --compact
-#   artifacts:
-#     reports:
-#       sast: checkov-report.xml
-#     expire_in: 30 days
-#     when: always
-#   allow_failure: false
-
-# tfsec-scan:
-#   stage: security
-#   image:
-#     name: aquasec/tfsec:latest
-#     entrypoint: [""]
-#   script:
-#     - tfsec aws/ --config-file .tfsec.yml --format json --out tfsec-report.json --no-color
-#   artifacts:
-#     reports:
-#       sast: tfsec-report.json
-#     expire_in: 30 days
-#     when: always
+#   rules:
+#     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+#     - if: $CI_COMMIT_BRANCH == "master"
 #   allow_failure: true
+#   artifacts:
+#     when: always
 

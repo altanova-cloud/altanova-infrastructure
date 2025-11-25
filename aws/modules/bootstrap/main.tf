@@ -179,6 +179,3 @@ resource "aws_iam_role_policy" "gitlab_runner_shared" {
     ]
   })
 }
-
-  })
-}

@@ -92,6 +92,7 @@ variables:
 
 # Security Stage
 # Note: Review scanner versions quarterly for updates
+# Security scans are REQUIRED - pipeline will fail if critical issues found
 checkov-scan:
   stage: security
   image:
@@ -104,7 +105,7 @@ checkov-scan:
         --output cli \
         --output json \
         --output-file-path console,results.json \
-        --compact || true
+        --compact
     - |
       if [ -f results.json ]; then
         cp results.json results_sast.json
@@ -118,7 +119,7 @@ checkov-scan:
       - results_sast.json
     expire_in: 30 days
     when: always
-  allow_failure: true
+  allow_failure: false
 
 tfsec-scan:
   stage: security
@@ -126,7 +127,7 @@ tfsec-scan:
     name: aquasec/tfsec:latest
     entrypoint: [""]
   script:
-    - tfsec aws/ --format sarif --out tfsec-report.sarif --no-color || true
+    - tfsec aws/ --format sarif --out tfsec-report.sarif --no-color
   artifacts:
     reports:
       sast: tfsec-report.sarif
@@ -134,7 +135,7 @@ tfsec-scan:
       - tfsec-report.sarif
     expire_in: 30 days
     when: always
-  allow_failure: true
+  allow_failure: false
 
 # Validation Stage
 validate:
@@ -172,6 +173,7 @@ validate:
 
 # Cost Estimation Stage
 # Note: Infracost requires INFRACOST_API_KEY to be set in CI/CD variables
+# Cost estimation is REQUIRED for production - prevents surprise bills
 infracost:
   stage: cost
   image:
@@ -181,7 +183,7 @@ infracost:
     ENV_DIR: shared-account
   script:
     - cd ${TF_ROOT}/${ENV_DIR}
-    - infracost breakdown --path . --format json --out-file infracost.json || echo "Infracost failed"
+    - infracost breakdown --path . --format json --out-file infracost.json
   artifacts:
     paths:
       - aws/environments/shared-account/infracost.json
@@ -189,7 +191,7 @@ infracost:
     when: always
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-  allow_failure: true
+  allow_failure: false
 
 # Approval Stage (runs on master only)
 .approve:

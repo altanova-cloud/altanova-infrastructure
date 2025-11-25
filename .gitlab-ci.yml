@@ -13,6 +13,10 @@ workflow:
     - if: $CI_COMMIT_BRANCH == "master"
     - when: never
 
+# Include external CI/CD configuration files
+include:
+  - local: '.gitlab/ci/security.yml'
+
 variables:
   TF_ROOT: ${CI_PROJECT_DIR}/aws/environments
   AWS_DEFAULT_REGION: us-east-1
@@ -89,53 +93,6 @@ variables:
       else
         terraform init
       fi
-
-# Security Stage
-# Note: Review scanner versions quarterly for updates
-# Security scans are REQUIRED - pipeline will fail if critical issues found
-checkov-scan:
-  stage: security
-  image:
-    name: bridgecrew/checkov:3  # Major version 3.x - compatible with GitLab 15.x SAST
-    entrypoint: [""]
-  script:
-    - |
-      checkov -d aws/ \
-        --framework terraform \
-        --output cli \
-        --output json \
-        --output-file-path console,results.json \
-        --compact
-    - |
-      if [ -f results.json ]; then
-        cp results.json results_sast.json
-      else
-        echo '{"version":"15.0.0","vulnerabilities":[]}' > results_sast.json
-      fi
-  artifacts:
-    reports:
-      sast: results_sast.json
-    paths:
-      - results_sast.json
-    expire_in: 30 days
-    when: always
-  allow_failure: false
-
-tfsec-scan:
-  stage: security
-  image:
-    name: aquasec/tfsec:latest
-    entrypoint: [""]
-  script:
-    - tfsec aws/ --config-file .tfsec.yml --format sarif --out tfsec-report.sarif --no-color
-  artifacts:
-    reports:
-      sast: tfsec-report.sarif
-    paths:
-      - tfsec-report.sarif
-    expire_in: 30 days
-    when: always
-  allow_failure: false
 
 # Validation Stage
 validate:

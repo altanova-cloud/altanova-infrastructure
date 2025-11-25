@@ -180,11 +180,12 @@ infracost:
     ENV_DIR: shared-account
   script:
     - cd ${TF_ROOT}/${ENV_DIR}
-    - infracost breakdown --path . --format json --out-file /tmp/infracost.json || echo "Infracost failed"
+    - infracost breakdown --path . --format json --out-file infracost.json || echo "Infracost failed"
   artifacts:
     paths:
-      - /tmp/infracost.json
+      - aws/environments/shared-account/infracost.json
     expire_in: 30 days
+    when: always
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   allow_failure: true

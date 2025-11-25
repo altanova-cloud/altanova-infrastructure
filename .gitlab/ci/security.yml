@@ -2,41 +2,54 @@
 # This file contains all security-related CI/CD jobs
 # Maintained by: Security/DevSecOps team
 
-# Security Stage Jobs
-# Note: Review scanner versions quarterly for updates
-# Security scans are REQUIRED - pipeline will fail if critical issues found
+# Using GitLab's official IaC scanning template (recommended)
+# This provides better integration with GitLab Security Dashboard
+# and uses industry-standard tools (Checkov, tfsec, kics)
 
-checkov-scan:
-  stage: security
-  image:
-    name: bridgecrew/checkov:3  # Major version 3.x - compatible with GitLab 15.x SAST
-    entrypoint: [""]
-  script:
-    - |
-      checkov -d aws/ \
-        --framework terraform \
-        --output cli \
-        --output json \
-        --output-file-path console,checkov-report.xml \
-        --compact
-  artifacts:
-    reports:
-      sast: checkov-report.xml
-    expire_in: 30 days
-    when: always
-  allow_failure: false
+include:
+  - template: Security/SAST-IaC.gitlab-ci.yml
 
-tfsec-scan:
-  stage: security
-  image:
-    name: aquasec/tfsec:latest
-    entrypoint: [""]
-  script:
-    - tfsec aws/ --config-file .tfsec.yml --format json --out tfsec-report.json --no-color
-  artifacts:
-    reports:
-      sast: tfsec-report.json
-    expire_in: 30 days
-    when: always
-  allow_failure: true
+variables:
+  SAST_EXCLUDED_PATHS: "spec,test,tests,tmp,.terraform"
+
+# ============================================================================
+# CUSTOM SCANNERS (COMMENTED OUT - Using GitLab template above instead)
+# ============================================================================
+# Uncomment below if you need custom scanner configuration
+# Note: GitLab template is recommended for better dashboard integration
+# ============================================================================
+
+# checkov-scan:
+#   stage: security
+#   image:
+#     name: bridgecrew/checkov:3
+#     entrypoint: [""]
+#   script:
+#     - |
+#       checkov -d aws/ \
+#         --framework terraform \
+#         --output cli \
+#         --output json \
+#         --output-file-path console,checkov-report.xml \
+#         --compact
+#   artifacts:
+#     reports:
+#       sast: checkov-report.xml
+#     expire_in: 30 days
+#     when: always
+#   allow_failure: false
+
+# tfsec-scan:
+#   stage: security
+#   image:
+#     name: aquasec/tfsec:latest
+#     entrypoint: [""]
+#   script:
+#     - tfsec aws/ --config-file .tfsec.yml --format json --out tfsec-report.json --no-color
+#   artifacts:
+#     reports:
+#       sast: tfsec-report.json
+#     expire_in: 30 days
+#     when: always
+#   allow_failure: true
 

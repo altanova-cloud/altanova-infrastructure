@@ -127,7 +127,7 @@ tfsec-scan:
     name: aquasec/tfsec:latest
     entrypoint: [""]
   script:
-    - tfsec aws/ --format sarif --out tfsec-report.sarif --no-color
+    - tfsec aws/ --config-file .tfsec.yml --format sarif --out tfsec-report.sarif --no-color
   artifacts:
     reports:
       sast: tfsec-report.sarif

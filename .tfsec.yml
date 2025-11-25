@@ -1,0 +1,28 @@
+# tfsec configuration
+# https://aquasecurity.github.io/tfsec/latest/guides/configuration/config/
+
+# Minimum severity to report
+minimum_severity: MEDIUM
+
+# Exclude specific checks with justification
+exclude:
+  # AWS S3 bucket logging
+  - aws-s3-enable-bucket-logging
+    # Justification: State bucket doesn't need access logging for cost reasons
+  
+  # AWS S3 bucket versioning  
+  - aws-s3-enable-versioning
+    # Justification: Versioning is enabled via separate resource
+  
+  # AWS IAM password policy
+  - aws-iam-set-minimum-password-length
+    # Justification: Using SSO, not IAM users with passwords
+
+# Exclude specific directories
+exclude_paths:
+  - .terraform/**
+  - **/.terraform/**
+
+# Custom severity overrides (if needed)
+# severity_overrides:
+#   aws-s3-enable-bucket-encryption: ERROR

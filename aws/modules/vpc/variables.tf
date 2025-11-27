@@ -1,5 +1,6 @@
 # VPC Module Variables
-# Based on existing infrastructure design (172.16.0.0/16)
+# Based on AWS Architecture Recommendation (10.x.0.0/16)
+# Dev: 10.0.0.0/16, Prod: 10.1.0.0/16
 
 variable "environment" {
   description = "Environment name (dev, prod, shared-services)"
@@ -12,9 +13,12 @@ variable "cluster_name" {
 }
 
 variable "vpc_cidr" {
-  description = "CIDR block for VPC"
+  description = "CIDR block for VPC (use 10.0.0.0/16 for dev, 10.1.0.0/16 for prod)"
   type        = string
-  default     = "172.16.0.0/16"
+  validation {
+    condition     = can(cidrhost(var.vpc_cidr, 0))
+    error_message = "VPC CIDR must be a valid IPv4 CIDR block."
+  }
 }
 
 variable "availability_zone_a" {
@@ -27,28 +31,67 @@ variable "availability_zone_b" {
   type        = string
 }
 
-variable "public_subnet_cidr_zone_a" {
-  description = "CIDR for public subnet in zone A"
+variable "availability_zone_c" {
+  description = "Third availability zone (optional, for prod HA)"
   type        = string
-  default     = "172.16.0.0/24"
+  default     = null
+}
+
+# Public Subnets (for ALB, NAT Gateway)
+variable "public_subnet_cidr_zone_a" {
+  description = "CIDR for public subnet in zone A (default: x.x.1.0/24)"
+  type        = string
+  default     = null
 }
 
 variable "public_subnet_cidr_zone_b" {
-  description = "CIDR for public subnet in zone B"
+  description = "CIDR for public subnet in zone B (default: x.x.2.0/24)"
   type        = string
-  default     = "172.16.1.0/24"
+  default     = null
 }
 
-variable "private_subnet_cidr_zone_a" {
-  description = "CIDR for private subnet in zone A"
+variable "public_subnet_cidr_zone_c" {
+  description = "CIDR for public subnet in zone C (default: x.x.3.0/24)"
   type        = string
-  default     = "172.16.2.0/24"
+  default     = null
+}
+
+# Private Subnets (for EKS nodes and pods)
+variable "private_subnet_cidr_zone_a" {
+  description = "CIDR for private subnet in zone A (default: x.x.10.0/24)"
+  type        = string
+  default     = null
 }
 
 variable "private_subnet_cidr_zone_b" {
-  description = "CIDR for private subnet in zone B"
+  description = "CIDR for private subnet in zone B (default: x.x.11.0/24)"
   type        = string
-  default     = "172.16.3.0/24"
+  default     = null
+}
+
+variable "private_subnet_cidr_zone_c" {
+  description = "CIDR for private subnet in zone C (default: x.x.12.0/24)"
+  type        = string
+  default     = null
+}
+
+# Database Subnets (for RDS, ElastiCache)
+variable "database_subnet_cidr_zone_a" {
+  description = "CIDR for database subnet in zone A (default: x.x.20.0/24)"
+  type        = string
+  default     = null
+}
+
+variable "database_subnet_cidr_zone_b" {
+  description = "CIDR for database subnet in zone B (default: x.x.21.0/24)"
+  type        = string
+  default     = null
+}
+
+variable "database_subnet_cidr_zone_c" {
+  description = "CIDR for database subnet in zone C (default: x.x.22.0/24)"
+  type        = string
+  default     = null
 }
 
 variable "enable_nat_gateway_zone_b" {

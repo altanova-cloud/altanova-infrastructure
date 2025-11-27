@@ -1,5 +1,6 @@
 # VPC Module - Reusable Network Foundation
-# Based on existing infrastructure subnet design (172.16.0.0/16)
+# Based on AWS Architecture Recommendation (10.x.0.0/16)
+# Supports 3-tier architecture: Public, Private, Database subnets
 
 terraform {
   required_version = ">= 1.0"
@@ -12,11 +13,35 @@ terraform {
 }
 
 locals {
+  # Extract second octet from VPC CIDR (e.g., "10.0.0.0/16" -> "0", "10.1.0.0/16" -> "1")
+  vpc_second_octet = split(".", var.vpc_cidr)[1]
+  
+  # Auto-calculate subnet CIDRs if not provided
+  # Public subnets: 10.x.1.0/24, 10.x.2.0/24, 10.x.3.0/24
+  # Private subnets: 10.x.10.0/24, 10.x.11.0/24, 10.x.12.0/24
+  # Database subnets: 10.x.20.0/24, 10.x.21.0/24, 10.x.22.0/24
+  
+  public_subnet_cidr_a  = coalesce(var.public_subnet_cidr_zone_a, "10.${local.vpc_second_octet}.1.0/24")
+  public_subnet_cidr_b  = coalesce(var.public_subnet_cidr_zone_b, "10.${local.vpc_second_octet}.2.0/24")
+  public_subnet_cidr_c  = coalesce(var.public_subnet_cidr_zone_c, "10.${local.vpc_second_octet}.3.0/24")
+  
+  private_subnet_cidr_a = coalesce(var.private_subnet_cidr_zone_a, "10.${local.vpc_second_octet}.10.0/24")
+  private_subnet_cidr_b = coalesce(var.private_subnet_cidr_zone_b, "10.${local.vpc_second_octet}.11.0/24")
+  private_subnet_cidr_c = coalesce(var.private_subnet_cidr_zone_c, "10.${local.vpc_second_octet}.12.0/24")
+  
+  database_subnet_cidr_a = coalesce(var.database_subnet_cidr_zone_a, "10.${local.vpc_second_octet}.20.0/24")
+  database_subnet_cidr_b = coalesce(var.database_subnet_cidr_zone_b, "10.${local.vpc_second_octet}.21.0/24")
+  database_subnet_cidr_c = coalesce(var.database_subnet_cidr_zone_c, "10.${local.vpc_second_octet}.22.0/24")
+  
+  # Determine if zone C is enabled
+  enable_zone_c = var.availability_zone_c != null
+  
   common_tags = merge(
     var.tags,
     {
       "kubernetes.io/cluster/${var.cluster_name}" = "owned"
       "Provisioner"                                = "Created By Terraform"
+      "Environment"                                = var.environment
     }
   )
 }
@@ -50,7 +75,7 @@ resource "aws_internet_gateway" "main" {
 # Public Subnet - Zone A
 resource "aws_subnet" "public_zone_a" {
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.public_subnet_cidr_zone_a
+  cidr_block              = local.public_subnet_cidr_a
   availability_zone       = var.availability_zone_a
   map_public_ip_on_launch = true
 
@@ -59,6 +84,7 @@ resource "aws_subnet" "public_zone_a" {
     {
       Name                     = "${var.environment}-public-${var.availability_zone_a}"
       "kubernetes.io/role/elb" = "1"
+      "Tier"                   = "Public"
     }
   )
 }
@@ -66,7 +92,7 @@ resource "aws_subnet" "public_zone_a" {
 # Public Subnet - Zone B
 resource "aws_subnet" "public_zone_b" {
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.public_subnet_cidr_zone_b
+  cidr_block              = local.public_subnet_cidr_b
   availability_zone       = var.availability_zone_b
   map_public_ip_on_launch = true
 
@@ -75,14 +101,33 @@ resource "aws_subnet" "public_zone_b" {
     {
       Name                     = "${var.environment}-public-${var.availability_zone_b}"
       "kubernetes.io/role/elb" = "1"
+      "Tier"                   = "Public"
     }
   )
 }
 
-# Private Subnet - Zone A
+# Public Subnet - Zone C (optional)
+resource "aws_subnet" "public_zone_c" {
+  count                   = local.enable_zone_c ? 1 : 0
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = local.public_subnet_cidr_c
+  availability_zone       = var.availability_zone_c
+  map_public_ip_on_launch = true
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name                     = "${var.environment}-public-${var.availability_zone_c}"
+      "kubernetes.io/role/elb" = "1"
+      "Tier"                   = "Public"
+    }
+  )
+}
+
+# Private Subnet - Zone A (for EKS nodes and pods)
 resource "aws_subnet" "private_zone_a" {
   vpc_id            = aws_vpc.main.id
-  cidr_block        = var.private_subnet_cidr_zone_a
+  cidr_block        = local.private_subnet_cidr_a
   availability_zone = var.availability_zone_a
 
   tags = merge(
@@ -90,14 +135,15 @@ resource "aws_subnet" "private_zone_a" {
     {
       Name                              = "${var.environment}-private-${var.availability_zone_a}"
       "kubernetes.io/role/internal-elb" = "1"
+      "Tier"                            = "Private"
     }
   )
 }
 
-# Private Subnet - Zone B
+# Private Subnet - Zone B (for EKS nodes and pods)
 resource "aws_subnet" "private_zone_b" {
   vpc_id            = aws_vpc.main.id
-  cidr_block        = var.private_subnet_cidr_zone_b
+  cidr_block        = local.private_subnet_cidr_b
   availability_zone = var.availability_zone_b
 
   tags = merge(
@@ -105,6 +151,70 @@ resource "aws_subnet" "private_zone_b" {
     {
       Name                              = "${var.environment}-private-${var.availability_zone_b}"
       "kubernetes.io/role/internal-elb" = "1"
+      "Tier"                            = "Private"
+    }
+  )
+}
+
+# Private Subnet - Zone C (optional, for EKS nodes and pods)
+resource "aws_subnet" "private_zone_c" {
+  count             = local.enable_zone_c ? 1 : 0
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = local.private_subnet_cidr_c
+  availability_zone = var.availability_zone_c
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name                              = "${var.environment}-private-${var.availability_zone_c}"
+      "kubernetes.io/role/internal-elb" = "1"
+      "Tier"                            = "Private"
+    }
+  )
+}
+
+# Database Subnet - Zone A (for RDS, ElastiCache)
+resource "aws_subnet" "database_zone_a" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = local.database_subnet_cidr_a
+  availability_zone = var.availability_zone_a
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${var.environment}-database-${var.availability_zone_a}"
+      "Tier" = "Database"
+    }
+  )
+}
+
+# Database Subnet - Zone B (for RDS, ElastiCache)
+resource "aws_subnet" "database_zone_b" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = local.database_subnet_cidr_b
+  availability_zone = var.availability_zone_b
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${var.environment}-database-${var.availability_zone_b}"
+      "Tier" = "Database"
+    }
+  )
+}
+
+# Database Subnet - Zone C (optional, for RDS, ElastiCache)
+resource "aws_subnet" "database_zone_c" {
+  count             = local.enable_zone_c ? 1 : 0
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = local.database_subnet_cidr_c
+  availability_zone = var.availability_zone_c
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${var.environment}-database-${var.availability_zone_c}"
+      "Tier" = "Database"
     }
   )
 }
@@ -200,6 +310,13 @@ resource "aws_route_table_association" "public_zone_b" {
   route_table_id = aws_route_table.public.id
 }
 
+# Public Route Table Association - Zone C (optional)
+resource "aws_route_table_association" "public_zone_c" {
+  count          = local.enable_zone_c ? 1 : 0
+  subnet_id      = aws_subnet.public_zone_c[0].id
+  route_table_id = aws_route_table.public.id
+}
+
 # Private Route Table - Zone A
 resource "aws_route_table" "private_zone_a" {
   vpc_id = aws_vpc.main.id
@@ -249,6 +366,55 @@ resource "aws_route" "private_nat_gateway_zone_b" {
 resource "aws_route_table_association" "private_zone_b" {
   subnet_id      = aws_subnet.private_zone_b.id
   route_table_id = aws_route_table.private_zone_b.id
+}
+
+# Private Route Table - Zone C (optional)
+resource "aws_route_table" "private_zone_c" {
+  count  = local.enable_zone_c ? 1 : 0
+  vpc_id = aws_vpc.main.id
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${var.environment}-private-rt-${var.availability_zone_c}"
+    }
+  )
+}
+
+# Private Route to NAT Gateway - Zone C
+resource "aws_route" "private_nat_gateway_zone_c" {
+  count                  = local.enable_zone_c ? 1 : 0
+  route_table_id         = aws_route_table.private_zone_c[0].id
+  destination_cidr_block = "0.0.0.0/0"
+  # Use Zone C NAT if enabled, otherwise use Zone A NAT
+  nat_gateway_id = var.enable_nat_gateway_zone_b ? aws_nat_gateway.zone_b[0].id : aws_nat_gateway.zone_a.id
+}
+
+# Private Route Table Association - Zone C
+resource "aws_route_table_association" "private_zone_c" {
+  count          = local.enable_zone_c ? 1 : 0
+  subnet_id      = aws_subnet.private_zone_c[0].id
+  route_table_id = aws_route_table.private_zone_c[0].id
+}
+
+# Database Subnet Group (for RDS)
+resource "aws_db_subnet_group" "main" {
+  name       = "${var.environment}-${var.cluster_name}-db-subnet-group"
+  subnet_ids = local.enable_zone_c ? [
+    aws_subnet.database_zone_a.id,
+    aws_subnet.database_zone_b.id,
+    aws_subnet.database_zone_c[0].id
+  ] : [
+    aws_subnet.database_zone_a.id,
+    aws_subnet.database_zone_b.id
+  ]
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${var.environment}-db-subnet-group"
+    }
+  )
 }
 
 # VPC Flow Logs (optional)

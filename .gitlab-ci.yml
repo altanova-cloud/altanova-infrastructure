@@ -6,11 +6,10 @@ stages:
   - approve
   - apply
 
-# Workflow rules - only run on MRs and master
+# Workflow rules - only run on merge requests
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "master"
     - when: never
 
 # Include external CI/CD configuration files

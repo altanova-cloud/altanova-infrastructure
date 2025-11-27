@@ -98,6 +98,7 @@ variables:
       else
         terraform init
       fi
+# Validation Stage
 
 fmt:
   extends: .terraform
@@ -111,12 +112,19 @@ fmt:
     matrix:
       - ENV_DIR: [shared-account, dev-app-account, prod-app-account]
 
-# Validation Stage
+lint:
+  stage: validate
+  image: ghcr.io/terraform-linters/tflint:latest
+  needs: [fmt]
+  script:
+    - tflint --recursive
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
 validate:
   extends: .terraform
   stage: validate
-  needs: [fmt]
+  needs: [fmt, lint]
   script:
     - terraform validate
   rules:

@@ -14,19 +14,19 @@ resource "kubernetes_manifest" "karpenter_node_class" {
     spec = {
       amiFamily = "Ubuntu"
       role      = module.eks_blueprints_addons.karpenter.node_iam_role_name
-      
+
       subnetSelectorTerms = [{
         tags = {
           "karpenter.sh/discovery" = var.cluster_name
         }
       }]
-      
+
       securityGroupSelectorTerms = [{
         tags = {
           "karpenter.sh/discovery" = var.cluster_name
         }
       }]
-      
+
       blockDeviceMappings = [{
         deviceName = "/dev/xvda"
         ebs = {
@@ -36,14 +36,14 @@ resource "kubernetes_manifest" "karpenter_node_class" {
           deleteOnTermination = true
         }
       }]
-      
+
       metadataOptions = {
         httpEndpoint            = "enabled"
         httpProtocolIPv6        = "disabled"
         httpPutResponseHopLimit = 2
         httpTokens              = "required"
       }
-      
+
       tags = merge(
         var.tags,
         {

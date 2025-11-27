@@ -106,6 +106,12 @@ variable "enable_flow_logs" {
   default     = true
 }
 
+variable "enable_database_subnets" {
+  description = "Create database subnets and subnet group"
+  type        = bool
+  default     = false
+}
+
 variable "flow_logs_retention_days" {
   description = "Retention period for flow logs in days"
   type        = number

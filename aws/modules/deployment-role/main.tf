@@ -17,7 +17,7 @@ resource "aws_iam_role" "deployment" {
         }
       }
     ]
-  }) : jsonencode({
+    }) : jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
@@ -131,8 +131,8 @@ resource "aws_iam_role_policy" "deployment" {
       },
       # STS - Allow assuming state access role
       {
-        Effect = "Allow"
-        Action = "sts:AssumeRole"
+        Effect   = "Allow"
+        Action   = "sts:AssumeRole"
         Resource = var.state_access_role_arn
       },
       # Tags

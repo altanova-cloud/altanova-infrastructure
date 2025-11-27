@@ -18,6 +18,9 @@ module "vpc" {
   # Cost optimization - single NAT gateway (can enable more if needed)
   enable_nat_gateway_zone_b = false
 
+  # Enable database subnets and subnet group for RDS/ElastiCache
+  enable_database_subnets = true
+
   # Enable VPC Flow Logs for security and compliance
   enable_flow_logs         = true
   flow_logs_retention_days = 30 # Longer retention for prod

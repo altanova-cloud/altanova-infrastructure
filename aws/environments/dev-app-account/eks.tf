@@ -18,9 +18,9 @@ module "eks" {
   # Karpenter will manage all application workload nodes
   node_groups = {
     karpenter-system = {
-      instance_types = ["t3.small"]  # Small instances for system components
-      capacity_type  = "ON_DEMAND"   # On-demand for stability
-      min_size       = 1             # Single node sufficient for dev
+      instance_types = ["t3.small"] # Small instances for system components
+      capacity_type  = "ON_DEMAND"  # On-demand for stability
+      min_size       = 1            # Single node sufficient for dev
       max_size       = 1
       desired_size   = 1
 

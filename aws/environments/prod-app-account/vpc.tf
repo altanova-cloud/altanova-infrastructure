@@ -5,10 +5,10 @@ module "vpc" {
 
   environment         = "prod"
   cluster_name        = "altanova"
-  vpc_cidr            = "10.1.0.0/16"  # Prod uses 10.1.x.x
+  vpc_cidr            = "10.1.0.0/16" # Prod uses 10.1.x.x
   availability_zone_a = "eu-west-1a"
   availability_zone_b = "eu-west-1b"
-  availability_zone_c = "eu-west-1c"  # 3 AZs for production HA
+  availability_zone_c = "eu-west-1c" # 3 AZs for production HA
 
   # Subnet CIDRs will be auto-calculated:
   # Public: 10.1.1.0/24, 10.1.2.0/24, 10.1.3.0/24

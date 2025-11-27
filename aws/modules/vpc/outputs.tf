@@ -1,79 +1,107 @@
 output "vpc_id" {
   description = "ID of the VPC"
-  value       = module.vpc.vpc_id
+  value       = aws_vpc.main.id
 }
 
 output "vpc_cidr" {
   description = "CIDR block of the VPC"
-  value       = var.vpc_cidr
+  value       = aws_vpc.main.cidr_block
 }
 
 output "public_subnet_ids" {
   description = "IDs of all public subnets"
-  value       = module.vpc.public_subnets
+  value       = local.enable_zone_c ? [
+    aws_subnet.public_zone_a.id,
+    aws_subnet.public_zone_b.id,
+    aws_subnet.public_zone_c[0].id
+  ] : [
+    aws_subnet.public_zone_a.id,
+    aws_subnet.public_zone_b.id
+  ]
 }
 
 output "private_subnet_ids" {
   description = "IDs of all private subnets (for EKS)"
-  value       = module.vpc.private_subnets
+  value       = local.enable_zone_c ? [
+    aws_subnet.private_zone_a.id,
+    aws_subnet.private_zone_b.id,
+    aws_subnet.private_zone_c[0].id
+  ] : [
+    aws_subnet.private_zone_a.id,
+    aws_subnet.private_zone_b.id
+  ]
 }
 
 output "database_subnet_ids" {
   description = "IDs of all database subnets (for RDS, ElastiCache)"
-  value       = var.enable_database_subnets ? module.vpc.database_subnets : []
+  value       = local.enable_zone_c ? [
+    aws_subnet.database_zone_a.id,
+    aws_subnet.database_zone_b.id,
+    aws_subnet.database_zone_c[0].id
+  ] : [
+    aws_subnet.database_zone_a.id,
+    aws_subnet.database_zone_b.id
+  ]
 }
 
 output "db_subnet_group_name" {
   description = "Name of the DB subnet group"
-  value       = var.enable_database_subnets ? module.vpc.database_subnet_group_name : null
+  value       = aws_db_subnet_group.main.name
 }
 
 output "public_subnet_zone_a_id" {
   description = "ID of public subnet in zone A"
-  value       = module.vpc.public_subnets[0]
+  value       = aws_subnet.public_zone_a.id
 }
 
 output "public_subnet_zone_b_id" {
   description = "ID of public subnet in zone B"
-  value       = module.vpc.public_subnets[1]
+  value       = aws_subnet.public_zone_b.id
 }
 
 output "public_subnet_zone_c_id" {
   description = "ID of public subnet in zone C (if enabled)"
-  value       = local.enable_zone_c ? module.vpc.public_subnets[2] : null
+  value       = local.enable_zone_c ? aws_subnet.public_zone_c[0].id : null
 }
 
 output "private_subnet_zone_a_id" {
   description = "ID of private subnet in zone A"
-  value       = module.vpc.private_subnets[0]
+  value       = aws_subnet.private_zone_a.id
 }
 
 output "private_subnet_zone_b_id" {
   description = "ID of private subnet in zone B"
-  value       = module.vpc.private_subnets[1]
+  value       = aws_subnet.private_zone_b.id
 }
 
 output "private_subnet_zone_c_id" {
   description = "ID of private subnet in zone C (if enabled)"
-  value       = local.enable_zone_c ? module.vpc.private_subnets[2] : null
+  value       = local.enable_zone_c ? aws_subnet.private_zone_c[0].id : null
 }
 
 output "nat_gateway_zone_a_id" {
   description = "ID of NAT gateway in zone A"
-  value       = module.vpc.nat_gateway_ids[0]
+  value       = aws_nat_gateway.zone_a.id
 }
 
 output "nat_gateway_zone_b_id" {
   description = "ID of NAT gateway in zone B (if enabled)"
-  value       = var.enable_nat_gateway_zone_b ? module.vpc.nat_gateway_ids[1] : null
+  value       = var.enable_nat_gateway_zone_b ? aws_nat_gateway.zone_b[0].id : null
 }
 
 output "internet_gateway_id" {
   description = "ID of the Internet Gateway"
-  value       = module.vpc.igw_id
+  value       = aws_internet_gateway.main.id
 }
 
 output "availability_zones" {
   description = "List of availability zones used"
-  value       = local.azs
+  value       = local.enable_zone_c ? [
+    var.availability_zone_a,
+    var.availability_zone_b,
+    var.availability_zone_c
+  ] : [
+    var.availability_zone_a,
+    var.availability_zone_b
+  ]
 }

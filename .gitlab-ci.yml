@@ -117,6 +117,9 @@ validate:
 .plan:
   extends: .terraform
   stage: plan
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - when: never
   script:
     - terraform plan -out=tfplan | tee plan.txt
     - terraform show -no-color tfplan > plan-readable.txt

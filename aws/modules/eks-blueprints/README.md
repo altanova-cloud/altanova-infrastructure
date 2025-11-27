@@ -21,7 +21,7 @@ A wrapper module around AWS EKS Blueprints for standardized Kubernetes cluster d
 module "eks" {
   source = "../../modules/eks-blueprints"
   
-  cluster_name    = "technosol-dev"
+  cluster_name    = "altanova-dev"
   cluster_version = "1.32"
   environment     = "dev"
   
@@ -61,7 +61,7 @@ module "eks" {
 module "eks" {
   source = "../../modules/eks-blueprints"
   
-  cluster_name    = "technosol-prod"
+  cluster_name    = "altanova-prod"
   cluster_version = "1.32"
   environment     = "prod"
   
@@ -308,7 +308,7 @@ node_groups = {
 ### Configure kubectl
 
 ```bash
-aws eks update-kubeconfig --region eu-west-1 --name technosol-dev
+aws eks update-kubeconfig --region eu-west-1 --name altanova-dev
 ```
 
 ### Verify cluster

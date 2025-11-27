@@ -36,6 +36,20 @@ provider "aws" {
   }
 }
 
+# AWS provider for us-east-1 (required for Karpenter ECR Public access)
+provider "aws" {
+  alias  = "virginia"
+  region = "us-east-1"
+
+  default_tags {
+    tags = {
+      Environment = "dev"
+      ManagedBy   = "Terraform"
+      Project     = "AltaNova"
+    }
+  }
+}
+
 # Kubernetes provider configuration
 # This is configured after EKS cluster is created
 provider "kubernetes" {

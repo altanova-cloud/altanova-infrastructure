@@ -60,3 +60,19 @@ output "configure_kubectl" {
   description = "Command to configure kubectl"
   value       = "aws eks update-kubeconfig --region ${data.aws_region.current.name} --name ${module.eks.cluster_name}"
 }
+
+# Karpenter outputs
+output "karpenter_irsa_arn" {
+  description = "ARN of IAM role for Karpenter controller (IRSA)"
+  value       = try(module.eks_blueprints_addons.karpenter.irsa_arn, null)
+}
+
+output "karpenter_instance_profile_name" {
+  description = "Name of IAM instance profile for Karpenter nodes"
+  value       = try(module.eks_blueprints_addons.karpenter.instance_profile_name, null)
+}
+
+output "karpenter_node_role_arn" {
+  description = "ARN of IAM role for Karpenter nodes"
+  value       = try(module.eks_blueprints_addons.karpenter.node_iam_role_arn, null)
+}

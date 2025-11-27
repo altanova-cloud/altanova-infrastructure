@@ -70,7 +70,13 @@ variable "enable_metrics_server" {
 }
 
 variable "enable_cluster_autoscaler" {
-  description = "Enable Cluster Autoscaler"
+  description = "Enable Cluster Autoscaler (traditional approach)"
+  type        = bool
+  default     = false
+}
+
+variable "enable_karpenter" {
+  description = "Enable Karpenter for intelligent node provisioning (recommended for cost savings)"
   type        = bool
   default     = true
 }

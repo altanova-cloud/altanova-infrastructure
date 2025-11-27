@@ -136,6 +136,7 @@ resource "aws_subnet" "private_zone_a" {
       Name                              = "${var.environment}-private-${var.availability_zone_a}"
       "kubernetes.io/role/internal-elb" = "1"
       "Tier"                            = "Private"
+      "karpenter.sh/discovery"          = var.cluster_name  # For Karpenter subnet discovery
     }
   )
 }
@@ -152,6 +153,7 @@ resource "aws_subnet" "private_zone_b" {
       Name                              = "${var.environment}-private-${var.availability_zone_b}"
       "kubernetes.io/role/internal-elb" = "1"
       "Tier"                            = "Private"
+      "karpenter.sh/discovery"          = var.cluster_name  # For Karpenter subnet discovery
     }
   )
 }
@@ -169,6 +171,7 @@ resource "aws_subnet" "private_zone_c" {
       Name                              = "${var.environment}-private-${var.availability_zone_c}"
       "kubernetes.io/role/internal-elb" = "1"
       "Tier"                            = "Private"
+      "karpenter.sh/discovery"          = var.cluster_name  # For Karpenter subnet discovery
     }
   )
 }

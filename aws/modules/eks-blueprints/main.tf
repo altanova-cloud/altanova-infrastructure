@@ -7,6 +7,7 @@ terraform {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
+      configuration_aliases = [aws.virginia]
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
@@ -133,7 +134,18 @@ module "eks_blueprints_addons" {
   # Core add-ons
   enable_aws_load_balancer_controller = var.enable_aws_load_balancer_controller
   enable_metrics_server               = var.enable_metrics_server
-  enable_cluster_autoscaler           = var.enable_cluster_autoscaler
+  
+  # Autoscaling - Choose one: Karpenter (recommended) OR Cluster Autoscaler
+  enable_karpenter          = var.enable_karpenter
+  enable_cluster_autoscaler = var.enable_cluster_autoscaler
+
+  # Karpenter configuration (if enabled)
+  karpenter = var.enable_karpenter ? {
+    enable_spot_termination          = true
+    enable_irsa                      = true
+    repository_username              = data.aws_ecrpublic_authorization_token.token.user_name
+    repository_password              = data.aws_ecrpublic_authorization_token.token.password
+  } : {}
 
   # Storage
   enable_aws_ebs_csi_driver = true
@@ -186,3 +198,8 @@ module "eks_blueprints_addons" {
 data "aws_region" "current" {}
 
 data "aws_caller_identity" "current" {}
+
+# ECR Public authorization token for Karpenter
+data "aws_ecrpublic_authorization_token" "token" {
+  provider = aws.virginia
+}

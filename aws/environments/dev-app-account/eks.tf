@@ -35,16 +35,19 @@ module "eks" {
     }
   }
 
-  # Core add-ons (always enabled)
+  # Core add-ons
   enable_aws_load_balancer_controller = true
   enable_metrics_server               = true
-  enable_cluster_autoscaler           = true
-  enable_gateway_api                  = true  # Modern networking
+  enable_gateway_api                  = true # Modern networking
+
+  # Autoscaling - Use Karpenter for better cost optimization
+  enable_karpenter          = true  # Intelligent node provisioning (up to 60% cost savings)
+  enable_cluster_autoscaler = false # Disabled in favor of Karpenter
 
   # Optional add-ons (disabled for now, enable when needed)
-  enable_aws_for_fluentbit     = false  # Enable when you need logging
-  enable_argocd                = false  # Enable when ready for GitOps
-  enable_kube_prometheus_stack = false  # Enable when you need monitoring
+  enable_aws_for_fluentbit     = false # Enable when you need logging
+  enable_argocd                = false # Enable when ready for GitOps
+  enable_kube_prometheus_stack = false # Enable when you need monitoring
 
   # CloudWatch logging
   cluster_enabled_log_types = ["api", "audit", "authenticator"]
@@ -53,6 +56,11 @@ module "eks" {
     Environment = "dev"
     ManagedBy   = "Terraform"
     Project     = "AltaNova"
+  }
+
+  # Pass AWS provider for Karpenter ECR access
+  providers = {
+    aws.virginia = aws.virginia
   }
 
   depends_on = [module.vpc]

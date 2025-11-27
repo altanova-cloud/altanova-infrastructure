@@ -28,24 +28,32 @@ variables:
   # - GITLAB_TOKEN: For posting MR comments (optional)
   # - INFRACOST_API_KEY: For cost estimation (optional)
 
+.aws_auth_script: &aws_auth_script
+  - apk add --no-cache aws-cli jq
+  - >
+    aws_sts_output=$(aws sts assume-role-with-web-identity
+    --role-arn ${AWS_ROLE_ARN}
+    --role-session-name "GitLabRunner-${CI_PROJECT_ID}-${CI_PIPELINE_ID}"
+    --web-identity-token ${GITLAB_OIDC_TOKEN}
+    --duration-seconds 3600
+    --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]'
+    --output text)
+  - export $(printf "AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s AWS_SESSION_TOKEN=%s" $aws_sts_output)
+
 .terraform:
   image:
     name: hashicorp/terraform:latest
     entrypoint: [""]
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}-${ENV_DIR}"
+    paths:
+      - ${TF_ROOT}/${ENV_DIR}/.terraform/
+      - ${TF_ROOT}/${ENV_DIR}/.terraform.lock.hcl
   id_tokens:
     GITLAB_OIDC_TOKEN:
       aud: https://gitlab.com
   before_script:
-    - apk add --no-cache aws-cli jq
-    - >
-      aws_sts_output=$(aws sts assume-role-with-web-identity
-      --role-arn ${AWS_ROLE_ARN}
-      --role-session-name "GitLabRunner-${CI_PROJECT_ID}-${CI_PIPELINE_ID}"
-      --web-identity-token ${GITLAB_OIDC_TOKEN}
-      --duration-seconds 3600
-      --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]'
-      --output text)
-    - export $(printf "AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s AWS_SESSION_TOKEN=%s" $aws_sts_output)
+    - *aws_auth_script
     - cd ${TF_ROOT}/${ENV_DIR}
     - |
       if [ -f backend.conf ]; then
@@ -59,21 +67,16 @@ variables:
   image:
     name: hashicorp/terraform:latest
     entrypoint: [""]
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}-${ENV_DIR}"
+    paths:
+      - ${TF_ROOT}/${ENV_DIR}/.terraform/
+      - ${TF_ROOT}/${ENV_DIR}/.terraform.lock.hcl
   id_tokens:
     GITLAB_OIDC_TOKEN:
       aud: https://gitlab.com
   before_script:
-    - apk add --no-cache aws-cli jq
-    # Step 1: Assume GitLabRunnerRole via OIDC
-    - >
-      aws_sts_output=$(aws sts assume-role-with-web-identity
-      --role-arn ${AWS_ROLE_ARN}
-      --role-session-name "GitLabRunner-${CI_PROJECT_ID}-${CI_PIPELINE_ID}"
-      --web-identity-token ${GITLAB_OIDC_TOKEN}
-      --duration-seconds 3600
-      --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]'
-      --output text)
-    - export $(printf "AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s AWS_SESSION_TOKEN=%s" $aws_sts_output)
+    - *aws_auth_script
     # Step 2: Assume environment-specific deployment role
     - |
       if [ -n "$DEPLOY_ROLE_ARN" ]; then
@@ -139,14 +142,15 @@ infracost:
   image:
     name: infracost/infracost:latest
     entrypoint: [""]
-  variables:
-    ENV_DIR: shared-account
+  parallel:
+    matrix:
+      - ENV_DIR: [shared-account, dev-app-account, prod-app-account]
   script:
     - cd ${TF_ROOT}/${ENV_DIR}
     - infracost breakdown --path . --format json --out-file infracost.json
   artifacts:
     paths:
-      - aws/environments/shared-account/infracost.json
+      - aws/environments/*/infracost.json
     expire_in: 30 days
     when: always
   rules:

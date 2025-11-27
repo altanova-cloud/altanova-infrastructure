@@ -165,7 +165,7 @@ infracost:
 
 # Apply Stage (runs on master only after approval)
 .apply:
-  extends: .terraform
+  extends: .assume_deploy_role
   stage: apply
   script:
     - terraform apply -auto-approve tfplan
@@ -244,6 +244,7 @@ dev-apply:
   extends: .apply
   variables:
     ENV_DIR: dev-app-account
+    DEPLOY_ROLE_ARN: $DEV_DEPLOY_ROLE_ARN
   environment:
     name: dev-app-account
     action: start
@@ -295,6 +296,7 @@ prod-apply:
   extends: .apply
   variables:
     ENV_DIR: prod-app-account
+    DEPLOY_ROLE_ARN: $PROD_DEPLOY_ROLE_ARN
   environment:
     name: prod-app-account
     action: start

@@ -20,9 +20,9 @@ module "eks" {
     karpenter-system = {
       instance_types = ["t3.small"]  # Small instances for system components
       capacity_type  = "ON_DEMAND"   # On-demand for stability
-      min_size       = 2
-      max_size       = 3
-      desired_size   = 2
+      min_size       = 1             # Single node for cost optimization
+      max_size       = 1
+      desired_size   = 1
 
       labels = {
         workload    = "system"

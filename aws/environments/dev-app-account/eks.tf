@@ -14,10 +14,11 @@ module "eks" {
   # Public endpoint for easier access in dev
   cluster_endpoint_public_access = true
 
-  # Node groups - cost-optimized for dev
+  # Node groups - SPOT instances for cost optimization
   node_groups = {
     general = {
       instance_types = ["t3.medium"]
+      capacity_type  = "SPOT"  # Use SPOT instances for cost savings
       min_size       = 2
       max_size       = 4
       desired_size   = 2
@@ -25,6 +26,7 @@ module "eks" {
       labels = {
         workload    = "general"
         environment = "dev"
+        capacity    = "spot"
       }
 
       tags = {

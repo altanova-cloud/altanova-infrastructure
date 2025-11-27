@@ -1,17 +1,17 @@
-# Dev Environment - EKS Cluster Configuration
+# Production Environment - EKS Cluster Configuration
 
 module "eks" {
   source = "../../modules/eks-blueprints"
 
-  cluster_name    = "altanova-dev"
+  cluster_name    = "altanova-prod"
   cluster_version = "1.32"
-  environment     = "dev"
+  environment     = "prod"
 
   # Network configuration
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnet_ids
 
-  # Public endpoint for easier access in dev
+  # Public endpoint for easier access (restrict via security groups)
   cluster_endpoint_public_access = true
 
   # Minimal node group ONLY for Karpenter controller and system components
@@ -21,12 +21,12 @@ module "eks" {
       instance_types = ["t3.small"]  # Small instances for system components
       capacity_type  = "ON_DEMAND"   # On-demand for stability
       min_size       = 2
-      max_size       = 2
+      max_size       = 3
       desired_size   = 2
 
       labels = {
         workload    = "system"
-        environment = "dev"
+        environment = "prod"
       }
 
       taints = [
@@ -38,7 +38,7 @@ module "eks" {
       ]
 
       tags = {
-        Name = "altanova-dev-system"
+        Name = "altanova-prod-system"
       }
     }
   }
@@ -52,16 +52,16 @@ module "eks" {
   enable_karpenter          = true  # Intelligent node provisioning (up to 60% cost savings)
   enable_cluster_autoscaler = false # Disabled in favor of Karpenter
 
-  # Optional add-ons (disabled for now, enable when needed)
-  enable_aws_for_fluentbit     = false # Enable when you need logging
+  # Production add-ons - Enable monitoring and logging
+  enable_aws_for_fluentbit     = true  # Centralized logging
   enable_argocd                = false # Enable when ready for GitOps
-  enable_kube_prometheus_stack = false # Enable when you need monitoring
+  enable_kube_prometheus_stack = true  # Full monitoring stack
 
-  # CloudWatch logging
-  cluster_enabled_log_types = ["api", "audit", "authenticator"]
+  # CloudWatch logging - all types for production
+  cluster_enabled_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
 
   tags = {
-    Environment = "dev"
+    Environment = "prod"
     ManagedBy   = "Terraform"
     Project     = "AltaNova"
   }

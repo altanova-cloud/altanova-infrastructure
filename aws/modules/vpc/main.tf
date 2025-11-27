@@ -15,33 +15,33 @@ terraform {
 locals {
   # Extract second octet from VPC CIDR (e.g., "10.0.0.0/16" -> "0", "10.1.0.0/16" -> "1")
   vpc_second_octet = split(".", var.vpc_cidr)[1]
-  
+
   # Auto-calculate subnet CIDRs if not provided
   # Public subnets: 10.x.1.0/24, 10.x.2.0/24, 10.x.3.0/24
   # Private subnets: 10.x.10.0/24, 10.x.11.0/24, 10.x.12.0/24
   # Database subnets: 10.x.20.0/24, 10.x.21.0/24, 10.x.22.0/24
-  
-  public_subnet_cidr_a  = coalesce(var.public_subnet_cidr_zone_a, "10.${local.vpc_second_octet}.1.0/24")
-  public_subnet_cidr_b  = coalesce(var.public_subnet_cidr_zone_b, "10.${local.vpc_second_octet}.2.0/24")
-  public_subnet_cidr_c  = coalesce(var.public_subnet_cidr_zone_c, "10.${local.vpc_second_octet}.3.0/24")
-  
+
+  public_subnet_cidr_a = coalesce(var.public_subnet_cidr_zone_a, "10.${local.vpc_second_octet}.1.0/24")
+  public_subnet_cidr_b = coalesce(var.public_subnet_cidr_zone_b, "10.${local.vpc_second_octet}.2.0/24")
+  public_subnet_cidr_c = coalesce(var.public_subnet_cidr_zone_c, "10.${local.vpc_second_octet}.3.0/24")
+
   private_subnet_cidr_a = coalesce(var.private_subnet_cidr_zone_a, "10.${local.vpc_second_octet}.10.0/24")
   private_subnet_cidr_b = coalesce(var.private_subnet_cidr_zone_b, "10.${local.vpc_second_octet}.11.0/24")
   private_subnet_cidr_c = coalesce(var.private_subnet_cidr_zone_c, "10.${local.vpc_second_octet}.12.0/24")
-  
+
   database_subnet_cidr_a = coalesce(var.database_subnet_cidr_zone_a, "10.${local.vpc_second_octet}.20.0/24")
   database_subnet_cidr_b = coalesce(var.database_subnet_cidr_zone_b, "10.${local.vpc_second_octet}.21.0/24")
   database_subnet_cidr_c = coalesce(var.database_subnet_cidr_zone_c, "10.${local.vpc_second_octet}.22.0/24")
-  
+
   # Determine if zone C is enabled
   enable_zone_c = var.availability_zone_c != null
-  
+
   common_tags = merge(
     var.tags,
     {
       "kubernetes.io/cluster/${var.cluster_name}" = "owned"
-      "Provisioner"                                = "Created By Terraform"
-      "Environment"                                = var.environment
+      "Provisioner"                               = "Created By Terraform"
+      "Environment"                               = var.environment
     }
   )
 }
@@ -136,7 +136,7 @@ resource "aws_subnet" "private_zone_a" {
       Name                              = "${var.environment}-private-${var.availability_zone_a}"
       "kubernetes.io/role/internal-elb" = "1"
       "Tier"                            = "Private"
-      "karpenter.sh/discovery"          = var.cluster_name  # For Karpenter subnet discovery
+      "karpenter.sh/discovery"          = var.cluster_name # For Karpenter subnet discovery
     }
   )
 }
@@ -153,7 +153,7 @@ resource "aws_subnet" "private_zone_b" {
       Name                              = "${var.environment}-private-${var.availability_zone_b}"
       "kubernetes.io/role/internal-elb" = "1"
       "Tier"                            = "Private"
-      "karpenter.sh/discovery"          = var.cluster_name  # For Karpenter subnet discovery
+      "karpenter.sh/discovery"          = var.cluster_name # For Karpenter subnet discovery
     }
   )
 }
@@ -171,7 +171,7 @@ resource "aws_subnet" "private_zone_c" {
       Name                              = "${var.environment}-private-${var.availability_zone_c}"
       "kubernetes.io/role/internal-elb" = "1"
       "Tier"                            = "Private"
-      "karpenter.sh/discovery"          = var.cluster_name  # For Karpenter subnet discovery
+      "karpenter.sh/discovery"          = var.cluster_name # For Karpenter subnet discovery
     }
   )
 }
@@ -185,7 +185,7 @@ resource "aws_subnet" "database_zone_a" {
   tags = merge(
     local.common_tags,
     {
-      Name = "${var.environment}-database-${var.availability_zone_a}"
+      Name   = "${var.environment}-database-${var.availability_zone_a}"
       "Tier" = "Database"
     }
   )
@@ -200,7 +200,7 @@ resource "aws_subnet" "database_zone_b" {
   tags = merge(
     local.common_tags,
     {
-      Name = "${var.environment}-database-${var.availability_zone_b}"
+      Name   = "${var.environment}-database-${var.availability_zone_b}"
       "Tier" = "Database"
     }
   )
@@ -216,7 +216,7 @@ resource "aws_subnet" "database_zone_c" {
   tags = merge(
     local.common_tags,
     {
-      Name = "${var.environment}-database-${var.availability_zone_c}"
+      Name   = "${var.environment}-database-${var.availability_zone_c}"
       "Tier" = "Database"
     }
   )
@@ -402,12 +402,12 @@ resource "aws_route_table_association" "private_zone_c" {
 
 # Database Subnet Group (for RDS)
 resource "aws_db_subnet_group" "main" {
-  name       = "${var.environment}-${var.cluster_name}-db-subnet-group"
+  name = "${var.environment}-${var.cluster_name}-db-subnet-group"
   subnet_ids = local.enable_zone_c ? [
     aws_subnet.database_zone_a.id,
     aws_subnet.database_zone_b.id,
     aws_subnet.database_zone_c[0].id
-  ] : [
+    ] : [
     aws_subnet.database_zone_a.id,
     aws_subnet.database_zone_b.id
   ]

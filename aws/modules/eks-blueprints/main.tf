@@ -5,8 +5,8 @@ terraform {
   required_version = ">= 1.0"
   required_providers {
     aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
+      source                = "hashicorp/aws"
+      version               = "~> 5.0"
       configuration_aliases = [aws.virginia]
     }
     kubernetes = {
@@ -81,7 +81,7 @@ module "eks" {
       type        = "ingress"
       self        = true
     }
-    
+
     ingress_cluster_all = {
       description                   = "Cluster to node all ports/protocols"
       protocol                      = "-1"
@@ -90,7 +90,7 @@ module "eks" {
       type                          = "ingress"
       source_cluster_security_group = true
     }
-    
+
     egress_all = {
       description      = "Node all egress"
       protocol         = "-1"
@@ -134,17 +134,17 @@ module "eks_blueprints_addons" {
   # Core add-ons
   enable_aws_load_balancer_controller = var.enable_aws_load_balancer_controller
   enable_metrics_server               = var.enable_metrics_server
-  
+
   # Autoscaling - Choose one: Karpenter (recommended) OR Cluster Autoscaler
   enable_karpenter          = var.enable_karpenter
   enable_cluster_autoscaler = var.enable_cluster_autoscaler
 
   # Karpenter configuration (if enabled)
   karpenter = var.enable_karpenter ? {
-    enable_spot_termination          = true
-    enable_irsa                      = true
-    repository_username              = data.aws_ecrpublic_authorization_token.token.user_name
-    repository_password              = data.aws_ecrpublic_authorization_token.token.password
+    enable_spot_termination = true
+    enable_irsa             = true
+    repository_username     = data.aws_ecrpublic_authorization_token.token.user_name
+    repository_password     = data.aws_ecrpublic_authorization_token.token.password
   } : {}
 
   # Storage

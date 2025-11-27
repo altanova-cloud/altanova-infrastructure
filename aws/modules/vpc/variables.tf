@@ -118,6 +118,12 @@ variable "flow_logs_retention_days" {
   default     = 30
 }
 
+variable "enable_database_subnets" {
+  description = "Enable database subnets for RDS and ElastiCache."
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Additional tags for all resources"
   type        = map(string)

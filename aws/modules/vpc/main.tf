@@ -1,6 +1,6 @@
-# VPC Module - Reusable Network Foundation
-# Based on AWS Architecture Recommendation (10.x.0.0/16)
-# Supports 3-tier architecture: Public, Private, Database subnets
+# VPC Module Configuration
+# This module provisions a VPC with public, private, and optional database subnets.
+# It supports optional Zone C and integrates with EKS, RDS, and CloudWatch.
 
 terraform {
   required_version = ">= 1.0"
@@ -46,181 +46,202 @@ locals {
   )
 }
 
-# VPC
-resource "aws_vpc" "main" {
-  cidr_block           = var.vpc_cidr
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "~> 5.0"
+
+  name = "${var.environment}-${var.cluster_name}"
+  cidr = var.vpc_cidr
+
+  azs             = var.availability_zone_c != null ? [var.availability_zone_a, var.availability_zone_b, var.availability_zone_c] : [var.availability_zone_a, var.availability_zone_b]
+  public_subnets  = var.availability_zone_c != null ? [
+    coalesce(var.public_subnet_cidr_zone_a, cidrsubnet(var.vpc_cidr, 8, 1)),
+    coalesce(var.public_subnet_cidr_zone_b, cidrsubnet(var.vpc_cidr, 8, 2)),
+    coalesce(var.public_subnet_cidr_zone_c, cidrsubnet(var.vpc_cidr, 8, 3))
+  ] : [
+    coalesce(var.public_subnet_cidr_zone_a, cidrsubnet(var.vpc_cidr, 8, 1)),
+    coalesce(var.public_subnet_cidr_zone_b, cidrsubnet(var.vpc_cidr, 8, 2))
+  ]
+
+  private_subnets = var.availability_zone_c != null ? [
+    coalesce(var.private_subnet_cidr_zone_a, cidrsubnet(var.vpc_cidr, 8, 10)),
+    coalesce(var.private_subnet_cidr_zone_b, cidrsubnet(var.vpc_cidr, 8, 11)),
+    coalesce(var.private_subnet_cidr_zone_c, cidrsubnet(var.vpc_cidr, 8, 12))
+  ] : [
+    coalesce(var.private_subnet_cidr_zone_a, cidrsubnet(var.vpc_cidr, 8, 10)),
+    coalesce(var.private_subnet_cidr_zone_b, cidrsubnet(var.vpc_cidr, 8, 11))
+  ]
+
+  database_subnets                   = var.enable_database_subnets ? (var.availability_zone_c != null ? [
+    coalesce(var.database_subnet_cidr_zone_a, cidrsubnet(var.vpc_cidr, 8, 20)),
+    coalesce(var.database_subnet_cidr_zone_b, cidrsubnet(var.vpc_cidr, 8, 21)),
+    coalesce(var.database_subnet_cidr_zone_c, cidrsubnet(var.vpc_cidr, 8, 22))
+  ] : [
+    coalesce(var.database_subnet_cidr_zone_a, cidrsubnet(var.vpc_cidr, 8, 20)),
+    coalesce(var.database_subnet_cidr_zone_b, cidrsubnet(var.vpc_cidr, 8, 21))
+  ]) : null
+  create_database_subnet_group       = var.enable_database_subnets
+  create_database_subnet_route_table = var.enable_database_subnets
+
+  enable_nat_gateway     = true
+  single_nat_gateway     = var.enable_nat_gateway_zone_b == false
+  one_nat_gateway_per_az = var.enable_nat_gateway_zone_b
+
   enable_dns_hostnames = true
   enable_dns_support   = true
 
-  tags = merge(
-    local.common_tags,
+  public_subnet_tags = merge(
+    var.tags,
     {
-      Name = "${var.environment}-${var.cluster_name}"
+      "kubernetes.io/role/elb" = "1"
+      Tier                      = "Public"
     }
   )
+
+  private_subnet_tags = merge(
+    var.tags,
+    {
+      "kubernetes.io/role/internal-elb" = "1"
+      Tier                               = "Private"
+      "karpenter.sh/discovery"          = var.cluster_name
+    }
+  )
+
+  enable_flow_log                     = var.enable_flow_logs
+  flow_log_destination_type           = "cloud-watch-logs"
+  create_flow_log_cloudwatch_iam_role = true
+  
+
+  tags = merge(var.tags, {
+    "kubernetes.io/cluster/${var.cluster_name}" = "owned"
+    Provisioner                                 = "Created By Terraform"
+    Environment                                 = var.environment
+  })
 }
+
+# VPC
+
 
 # Internet Gateway
-resource "aws_internet_gateway" "main" {
-  vpc_id = aws_vpc.main.id
 
-  tags = merge(
-    local.common_tags,
-    {
-      Name = "${var.environment}-igw"
-    }
-  )
-}
 
 # Public Subnet - Zone A
-resource "aws_subnet" "public_zone_a" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = local.public_subnet_cidr_a
-  availability_zone       = var.availability_zone_a
-  map_public_ip_on_launch = true
 
-  tags = merge(
-    local.common_tags,
-    {
-      Name                     = "${var.environment}-public-${var.availability_zone_a}"
-      "kubernetes.io/role/elb" = "1"
-      "Tier"                   = "Public"
-    }
-  )
-}
 
 # Public Subnet - Zone B
-resource "aws_subnet" "public_zone_b" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = local.public_subnet_cidr_b
-  availability_zone       = var.availability_zone_b
-  map_public_ip_on_launch = true
 
-  tags = merge(
-    local.common_tags,
-    {
-      Name                     = "${var.environment}-public-${var.availability_zone_b}"
-      "kubernetes.io/role/elb" = "1"
-      "Tier"                   = "Public"
-    }
-  )
-}
 
 # Public Subnet - Zone C (optional)
-resource "aws_subnet" "public_zone_c" {
-  count                   = local.enable_zone_c ? 1 : 0
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = local.public_subnet_cidr_c
-  availability_zone       = var.availability_zone_c
-  map_public_ip_on_launch = true
 
-  tags = merge(
-    local.common_tags,
-    {
-      Name                     = "${var.environment}-public-${var.availability_zone_c}"
-      "kubernetes.io/role/elb" = "1"
-      "Tier"                   = "Public"
-    }
-  )
-}
 
 # Private Subnet - Zone A (for EKS nodes and pods)
-resource "aws_subnet" "private_zone_a" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = local.private_subnet_cidr_a
-  availability_zone = var.availability_zone_a
 
-  tags = merge(
-    local.common_tags,
-    {
-      Name                              = "${var.environment}-private-${var.availability_zone_a}"
-      "kubernetes.io/role/internal-elb" = "1"
-      "Tier"                            = "Private"
-      "karpenter.sh/discovery"          = var.cluster_name # For Karpenter subnet discovery
-    }
-  )
-}
 
 # Private Subnet - Zone B (for EKS nodes and pods)
-resource "aws_subnet" "private_zone_b" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = local.private_subnet_cidr_b
-  availability_zone = var.availability_zone_b
 
-  tags = merge(
-    local.common_tags,
-    {
-      Name                              = "${var.environment}-private-${var.availability_zone_b}"
-      "kubernetes.io/role/internal-elb" = "1"
-      "Tier"                            = "Private"
-      "karpenter.sh/discovery"          = var.cluster_name # For Karpenter subnet discovery
-    }
-  )
-}
 
 # Private Subnet - Zone C (optional, for EKS nodes and pods)
-resource "aws_subnet" "private_zone_c" {
-  count             = local.enable_zone_c ? 1 : 0
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = local.private_subnet_cidr_c
-  availability_zone = var.availability_zone_c
 
-  tags = merge(
-    local.common_tags,
-    {
-      Name                              = "${var.environment}-private-${var.availability_zone_c}"
-      "kubernetes.io/role/internal-elb" = "1"
-      "Tier"                            = "Private"
-      "karpenter.sh/discovery"          = var.cluster_name # For Karpenter subnet discovery
-    }
-  )
-}
 
 # Database Subnet - Zone A (for RDS, ElastiCache)
-resource "aws_subnet" "database_zone_a" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = local.database_subnet_cidr_a
-  availability_zone = var.availability_zone_a
 
-  tags = merge(
-    local.common_tags,
-    {
-      Name   = "${var.environment}-database-${var.availability_zone_a}"
-      "Tier" = "Database"
-    }
-  )
-}
 
 # Database Subnet - Zone B (for RDS, ElastiCache)
-resource "aws_subnet" "database_zone_b" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = local.database_subnet_cidr_b
-  availability_zone = var.availability_zone_b
 
-  tags = merge(
-    local.common_tags,
-    {
-      Name   = "${var.environment}-database-${var.availability_zone_b}"
-      "Tier" = "Database"
-    }
-  )
-}
 
 # Database Subnet - Zone C (optional, for RDS, ElastiCache)
-resource "aws_subnet" "database_zone_c" {
-  count             = local.enable_zone_c ? 1 : 0
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = local.database_subnet_cidr_c
-  availability_zone = var.availability_zone_c
 
-  tags = merge(
-    local.common_tags,
-    {
-      Name   = "${var.environment}-database-${var.availability_zone_c}"
-      "Tier" = "Database"
-    }
-  )
-}
+
+# Elastic IP for NAT Gateway Zone A
+
+
+# NAT Gateway Zone A
+
+
+# Elastic IP for NAT Gateway Zone B (optional for HA)
+
+
+# NAT Gateway Zone B (optional for HA)
+
+
+# Public Route Table
+
+
+# Public Route to Internet Gateway
+
+
+# Public Route Table Association - Zone A
+
+
+# Public Route Table Association - Zone B
+
+
+# Public Route Table Association - Zone C (optional)
+
+
+# Private Route Table - Zone A
+
+
+# Private Route to NAT Gateway - Zone A
+
+
+# Private Route Table Association - Zone A
+
+
+# Private Route Table - Zone B
+
+
+# Private Route to NAT Gateway - Zone B
+
+
+# Private Route Table Association - Zone B
+
+
+# Private Route Table - Zone C (optional)
+
+
+# Private Route to NAT Gateway - Zone C
+
+
+# Private Route Table Association - Zone C
+
+
+# Database Subnet Group (for RDS)
+
+
+# VPC Flow Logs (optional)
+
+
+# CloudWatch Log Group for Flow Logs
+
+
+# IAM Role for Flow Logs
+
+
+# IAM Policy for Flow Logs
+
+
+
+# Public Subnet - Zone C (optional)
+
+
+# Private Subnet - Zone A (for EKS nodes and pods)
+
+
+# Private Subnet - Zone B (for EKS nodes and pods)
+
+
+# Private Subnet - Zone C (optional, for EKS nodes and pods)
+
+
+# Database Subnet - Zone A (for RDS, ElastiCache)
+
+
+# Database Subnet - Zone B (for RDS, ElastiCache)
+
+
+# Database Subnet - Zone C (optional, for RDS, ElastiCache)
+
 
 # Elastic IP for NAT Gateway Zone A
 resource "aws_eip" "nat_zone_a" {

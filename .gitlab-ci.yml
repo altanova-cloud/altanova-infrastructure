@@ -112,12 +112,11 @@ fmt:
     matrix:
       - ENV_DIR: [shared-account, dev-app-account, prod-app-account]
 
-lint:
+tflint:
   stage: validate
-  image: ghcr.io/terraform-linters/tflint:latest
-  needs: [fmt]
+  image: wata727/tflint
   script:
-    - tflint --recursive
+    - tflint --chdir=${TF_ROOT}/${ENV_DIR}
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 

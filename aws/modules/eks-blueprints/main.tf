@@ -148,12 +148,10 @@ module "eks_blueprints_addons" {
   } : {}
 
   # Storage
-  enable_aws_ebs_csi_driver = true
   enable_aws_efs_csi_driver = var.enable_aws_efs_csi_driver
 
   # Ingress - Modern approach with Gateway API
   # AWS Load Balancer Controller supports both Ingress and Gateway API
-  enable_aws_load_balancer_controller = var.enable_aws_load_balancer_controller
   aws_load_balancer_controller = var.enable_aws_load_balancer_controller ? {
     enable_service_monitor = true
     # Enable Gateway API support

@@ -99,12 +99,25 @@ variables:
         terraform init
       fi
 
-# Validation Stage
-validate:
+fmt:
   extends: .terraform
   stage: validate
   script:
     - terraform fmt -check -recursive
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - when: never
+  parallel:
+    matrix:
+      - ENV_DIR: [shared-account, dev-app-account, prod-app-account]
+
+# Validation Stage
+
+validate:
+  extends: .terraform
+  stage: validate
+  needs: [fmt]
+  script:
     - terraform validate
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -112,6 +125,7 @@ validate:
   parallel:
     matrix:
       - ENV_DIR: [shared-account, dev-app-account, prod-app-account]
+
 
 # Plan Stage
 .plan:

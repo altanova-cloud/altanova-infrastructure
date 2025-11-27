@@ -19,7 +19,7 @@ This directory contains modular CI/CD configuration files for better organizatio
 - `checkov-scan`: Terraform security scanning with Checkov
 - `tfsec-scan`: Terraform security scanning with tfsec
 
-**Maintained by**: Security/DevSecOps team
+**Maintained by**: Marwan Ghubein owner of Altanova repo
 
 **Configuration files**:
 - `.checkov.yaml` - Checkov configuration

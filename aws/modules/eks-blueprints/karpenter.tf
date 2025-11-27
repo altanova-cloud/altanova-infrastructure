@@ -12,7 +12,7 @@ resource "kubernetes_manifest" "karpenter_node_class" {
       name = "default"
     }
     spec = {
-      amiFamily = "AL2"
+      amiFamily = "Ubuntu"
       role      = module.eks_blueprints_addons.karpenter.node_iam_role_name
       
       subnetSelectorTerms = [{

@@ -104,6 +104,9 @@ validate:
   parallel:
     matrix:
       - ENV_DIR: [shared-account, dev-app-account, prod-app-account]
+    rules:
+      - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      - when: never
 
 # Plan Stage
 .plan:

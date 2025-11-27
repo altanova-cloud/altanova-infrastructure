@@ -112,7 +112,7 @@ fmt:
     matrix:
       - ENV_DIR: [shared-account, dev-app-account, prod-app-account]
 
-tflint:
+lint:
   stage: validate
   image: wata727/tflint
   script:

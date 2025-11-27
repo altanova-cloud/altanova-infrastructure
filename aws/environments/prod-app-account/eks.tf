@@ -29,13 +29,8 @@ module "eks" {
         environment = "prod"
       }
 
-      taints = [
-        {
-          key    = "CriticalAddonsOnly"
-          value  = "true"
-          effect = "NoSchedule"
-        }
-      ]
+      # No taints - system components need to schedule here
+      # Karpenter will create separate nodes for application workloads
 
       tags = {
         Name = "altanova-prod-system"

@@ -19,7 +19,7 @@ module "vpc" {
   enable_nat_gateway_zone_b = false
 
   # Enable database subnets and subnet group for RDS/ElastiCache
-  enable_database_subnets = true
+  # Database subnets are created by default when using this module
 
   # Enable VPC Flow Logs for security and compliance
   enable_flow_logs         = true

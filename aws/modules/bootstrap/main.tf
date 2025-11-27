@@ -151,7 +151,8 @@ resource "aws_iam_role_policy" "gitlab_runner_assume_role" {
         Action = "sts:AssumeRole"
         Resource = [
           "arn:aws:iam::${var.dev_account_id}:role/DevDeployRole",
-          "arn:aws:iam::${var.prod_account_id}:role/ProdDeployRole"
+          "arn:aws:iam::${var.prod_account_id}:role/ProdDeployRole",
+          "arn:aws:iam::975050047325:role/TerraformStateAccessRole"
         ]
       }
     ]

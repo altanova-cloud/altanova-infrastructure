@@ -48,8 +48,7 @@ variables:
   cache:
     key: "${CI_COMMIT_REF_SLUG}-${ENV_DIR}"
     paths:
-      - ${TF_ROOT}/${ENV_DIR}/.terraform/
-      - ${TF_ROOT}/${ENV_DIR}/.terraform.lock.hcl
+      - ${TF_ROOT}/${ENV_DIR}/.terraform.lock.hcl   # KEEP ONLY LOCK FILE
   id_tokens:
     GITLAB_OIDC_TOKEN:
       aud: https://gitlab.com
@@ -57,8 +56,12 @@ variables:
     - *aws_auth_script
     - cd ${TF_ROOT}/${ENV_DIR}
     - |
-      if [ -f backend.conf ]; then terraform init -backend-config=backend.conf;
-      else terraform init; fi
+      if [ -f backend.conf ]; then
+        terraform init -backend-config=backend.conf -reconfigure
+      else
+        terraform init -reconfigure
+      fi
+
 
 
 # -------------------------

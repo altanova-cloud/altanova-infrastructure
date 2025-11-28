@@ -1,28 +1,50 @@
 # tfsec configuration
 # https://aquasecurity.github.io/tfsec/latest/guides/configuration/config/
 
+# ---------------------------------------------------------
 # Minimum severity to report
-minimum_severity: MEDIUM
+# Valid values: LOW, MEDIUM, HIGH, CRITICAL
+# ---------------------------------------------------------
+minimum_severity: HIGH
 
+# ---------------------------------------------------------
 # Exclude specific checks with justification
+# (Keep exclusions small; only use when truly needed)
+# ---------------------------------------------------------
 exclude:
-  # AWS S3 bucket logging
+  # S3 bucket access logging (not required for cost reasons)
+  - AWS018
   - aws-s3-enable-bucket-logging
-    # Justification: State bucket doesn't need access logging for cost reasons
-  
-  # AWS S3 bucket versioning  
-  - aws-s3-enable-versioning
-    # Justification: Versioning is enabled via separate resource
-  
-  # AWS IAM password policy
-  - aws-iam-set-minimum-password-length
-    # Justification: Using SSO, not IAM users with passwords
 
-# Exclude specific directories
+  # S3 versioning managed outside Terraform
+  - aws-s3-enable-versioning
+
+  # IAM password policy — using SSO instead of IAM users
+  - aws-iam-set-minimum-password-length
+
+# ---------------------------------------------------------
+# Exclude directories
+# ---------------------------------------------------------
 exclude_paths:
   - .terraform/**
-  - **/.terraform/**
+  - "**/.terraform/**"
 
-# Custom severity overrides (if needed)
-# severity_overrides:
-#   aws-s3-enable-bucket-encryption: ERROR
+# ---------------------------------------------------------
+# Output formats (for CLI or other tooling)
+# NOTE: GitLab CI will override format for JUnit, but keeping defaults is fine
+# ---------------------------------------------------------
+format:
+  - default
+  - json
+  - sarif
+
+# ---------------------------------------------------------
+# Custom checks directory (optional)
+# Uncomment if you create custom rules under `.tfsec/`
+# ---------------------------------------------------------
+# custom-check-dir: .tfsec
+
+# ---------------------------------------------------------
+# Severity overrides (optional)
+# Example:
+# severit

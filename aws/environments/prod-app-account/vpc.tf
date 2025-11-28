@@ -15,15 +15,12 @@ module "vpc" {
   # Private: 10.1.10.0/24, 10.1.11.0/24, 10.1.12.0/24
   # Database: 10.1.20.0/24, 10.1.21.0/24, 10.1.22.0/24
 
-  # Cost optimization - single NAT gateway (can enable more if needed)
-  enable_nat_gateway_zone_b = false
-
   # Enable database subnets and subnet group for RDS/ElastiCache
   # Database subnets are created by default when using this module
 
   # Enable VPC Flow Logs for security and compliance
-  enable_flow_logs         = true
-  flow_logs_retention_days = 30 # Longer retention for prod
+  # Note: Module uses single NAT gateway by default for cost optimization
+  enable_flow_logs = true
 
   tags = {
     Environment = "prod"

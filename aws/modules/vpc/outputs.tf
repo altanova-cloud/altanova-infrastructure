@@ -15,7 +15,7 @@ output "database_subnet_ids" {
 }
 
 output "nat_gateway_ids" {
-  value = module.vpc.nat_gateway_ids
+  value = module.vpc.natgw_ids
 }
 
 output "availability_zones" {

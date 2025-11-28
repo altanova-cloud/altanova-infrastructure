@@ -1,0 +1,67 @@
+# Security Scanning Jobs
+# This file contains all security-related CI/CD jobs
+# Maintained by: Security/DevSecOps team
+
+# Note: GitLab's IaC template had issues generating reports
+# Using custom scanner configuration for better control
+
+# ============================================================================
+# CUSTOM SCANNERS (ACTIVE)
+# ============================================================================
+
+checkov-scan:
+  stage: security
+  image:
+    name: bridgecrew/checkov:3
+    entrypoint: [""]
+  script:
+    - |
+      checkov -d aws/ \
+        --framework terraform \
+        --output cli \
+        --output junitxml \
+        --output-file-path console,checkov-report.xml \
+        --compact || true
+  artifacts:
+    reports:
+      junit: checkov-report.xml
+    paths:
+      - checkov-report.xml
+    expire_in: 30 days
+    when: always
+  allow_failure: true
+
+tfsec-scan:
+  stage: security
+  image:
+    name: aquasec/tfsec:latest
+    entrypoint: [""]
+  script:
+    - tfsec aws/ --config-file .tfsec.yml --format junit --out tfsec-report.xml --no-color || true
+  artifacts:
+    reports:
+      junit: tfsec-report.xml
+    paths:
+      - tfsec-report.xml
+    expire_in: 30 days
+    when: always
+  allow_failure: true
+
+# ============================================================================
+# GITLAB IAC TEMPLATE (COMMENTED OUT - Had issues with report generation)
+# ============================================================================
+# include:
+#   - template: Security/SAST-IaC.gitlab-ci.yml
+#
+# variables:
+#   SAST_EXCLUDED_PATHS: "spec,test,tests,tmp,.terraform"
+#
+# iac-sast:
+#   stage: security
+#   rules:
+#     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+#     - if: $CI_COMMIT_BRANCH == "master"
+#   allow_failure: true
+#   artifacts:
+#     when: always
+

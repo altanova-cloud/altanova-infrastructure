@@ -1,0 +1,11 @@
+version: '3.7'
+services:
+  tf:
+    image: hashicorp/terraform:1.7
+    volumes:
+      - ../../../:/project
+    working_dir: /project/aws/environments/shared-account
+    environment:
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_SESSION_TOKEN

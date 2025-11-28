@@ -1,0 +1,135 @@
+---
+# Karpenter NodePool Configuration for AltaNova Dev
+# 
+# IMPORTANT: The EKS cluster has a small managed node group (2x t3.small) that runs:
+#   - Karpenter controller itself
+#   - CoreDNS
+#   - AWS Load Balancer Controller
+#   - Other system components
+#
+# This NodePool defines how Karpenter provisions nodes for APPLICATION WORKLOADS.
+# All your application pods will run on nodes created by Karpenter, NOT on the managed node group.
+
+apiVersion: karpenter.sh/v1beta1
+kind: NodePool
+metadata:
+  name: general-purpose
+  namespace: karpenter
+spec:
+  # Template for nodes that Karpenter will create
+  template:
+    metadata:
+      labels:
+        workload: general
+        environment: dev
+        managed-by: karpenter
+    
+    spec:
+      # Node requirements - Karpenter will select best instances matching these
+      requirements:
+        # Instance types - t3.medium for cost optimization
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values:
+            - t3.medium
+            - t3a.medium  # AMD alternative (often cheaper)
+        
+        # Capacity type - SPOT for cost savings (up to 70% cheaper)
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values:
+            - spot
+            - on-demand  # Fallback if spot unavailable
+        
+        # Architecture
+        - key: kubernetes.io/arch
+          operator: In
+          values:
+            - amd64
+        
+        # Availability zones
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values:
+            - eu-west-1a
+            - eu-west-1b
+      
+      # Node class reference
+      nodeClassRef:
+        name: default
+      
+      # Taints (optional - for dedicated workloads)
+      taints: []
+  
+  # Limits for this NodePool
+  limits:
+    cpu: "100"      # Max 100 vCPUs across all nodes in this pool
+    memory: 200Gi   # Max 200GB memory across all nodes in this pool
+  
+  # Disruption budget - how Karpenter can replace nodes
+  disruption:
+    # Consolidation - automatically replace nodes for better bin packing
+    consolidationPolicy: WhenUnderutilized
+    
+    # How long to wait before considering node for consolidation
+    consolidateAfter: 30s
+    
+    # Maximum percentage of nodes that can be disrupted at once
+    budgets:
+      - nodes: "10%"
+        reasons:
+          - Underutilized
+          - Empty
+
+---
+# Karpenter EC2NodeClass - defines AWS-specific configuration
+apiVersion: karpenter.k8s.aws/v1beta1
+kind: EC2NodeClass
+metadata:
+  name: default
+  namespace: karpenter
+spec:
+  # AMI selection - use latest EKS-optimized AMI
+  amiFamily: AL2
+  
+  # Subnet selection - use private subnets
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: altanova-dev
+  
+  # Security group selection
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: altanova-dev
+  
+  # IAM role for nodes
+  role: KarpenterNodeRole-altanova-dev
+  
+  # User data for node initialization
+  userData: |
+    #!/bin/bash
+    echo "Node provisioned by Karpenter"
+  
+  # Block device mappings
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 20Gi
+        volumeType: gp3
+        encrypted: true
+        deleteOnTermination: true
+  
+  # Metadata options
+  metadataOptions:
+    httpEndpoint: enabled
+    httpProtocolIPv6: disabled
+    httpPutResponseHopLimit: 2
+    httpTokens: required  # IMDSv2 required for security
+  
+  # Tags for instances
+  tags:
+    Name: altanova-dev-karpenter-node
+    Environment: dev
+    ManagedBy: Karpenter
+    Project: AltaNova
+    karpenter.sh/discovery: altanova-dev

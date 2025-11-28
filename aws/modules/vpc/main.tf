@@ -48,6 +48,7 @@ module "vpc" {
 
   # VPC DNS
   enable_dns_hostnames = true
+
   enable_dns_support   = true
 
   # Flow logs

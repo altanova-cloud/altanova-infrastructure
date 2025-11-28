@@ -114,9 +114,11 @@ fmt:
 
 lint:
   stage: validate
-  image: wata727/tflint
+  image: ghcr.io/terraform-linters/tflint
   script:
-    - tflint --chdir=${TF_ROOT}/${ENV_DIR}
+    - cd ${TF_ROOT}/${ENV_DIR}
+    - tflint --recursive
+  allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 

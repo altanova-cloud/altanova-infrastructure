@@ -13,6 +13,11 @@
 include:
   - local: ".gitlab/ci/templates.yml"
 
+variables:
+  TF_ROOT: "${CI_PROJECT_DIR}/aws/environments"
+  AWS_DEFAULT_REGION: us-east-1
+  TF_IN_AUTOMATION: "true"
+
 stages:
   - validate
   - plan

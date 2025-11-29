@@ -96,6 +96,7 @@
     - if: $CI_COMMIT_BRANCH == "master"
       when: manual
   script:
+    - export TF_ROOT="${CI_PROJECT_DIR}/aws/environments"
     - echo "Reviewing plan for ${ENV_DIR}"
     - cd ${TF_ROOT}/${ENV_DIR}
     - cat plan-readable.txt || echo "No plan found"

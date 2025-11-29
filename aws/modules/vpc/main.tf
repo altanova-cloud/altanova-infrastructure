@@ -1,3 +1,4 @@
+# VPC Module - Configures network infrastructure for EKS clusters
 terraform {
   required_version = ">= 1.0"
   required_providers {

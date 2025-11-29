@@ -55,6 +55,67 @@ module "eks" {
   # CloudWatch logging - all types for production
   cluster_enabled_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
 
+  # Karpenter Configuration
+  karpenter_node_class_config = {
+    ami_family  = "AL2023" # Upgraded from AL2 to AL2023
+    volume_size = "50Gi"   # Larger disk for production
+  }
+
+  karpenter_node_pools = {
+    general-purpose = {
+      labels = {
+        workload    = "general"
+        environment = "prod"
+        managed-by  = "karpenter"
+      }
+      requirements = [
+        { key = "karpenter.sh/capacity-type", operator = "In", values = ["spot", "on-demand"] },
+        { key = "kubernetes.io/arch", operator = "In", values = ["amd64"] },
+        { key = "topology.kubernetes.io/zone", operator = "In", values = ["eu-west-1a", "eu-west-1b", "eu-west-1c"] },
+        { key = "karpenter.k8s.aws/instance-category", operator = "In", values = ["t", "c", "m", "r"] },
+        { key = "karpenter.k8s.aws/instance-generation", operator = "Gt", values = ["2"] }
+      ]
+      limits = {
+        cpu    = "200"
+        memory = "400Gi"
+      }
+      disruption = {
+        consolidationPolicy = "WhenUnderutilized"
+        consolidateAfter    = "60s"
+        budgets             = [{ nodes = "5%" }]
+      }
+    }
+
+    critical-workloads = {
+      labels = {
+        workload    = "critical"
+        environment = "prod"
+        managed-by  = "karpenter"
+      }
+      requirements = [
+        { key = "karpenter.sh/capacity-type", operator = "In", values = ["on-demand"] }, # On-demand ONLY
+        { key = "kubernetes.io/arch", operator = "In", values = ["amd64"] },
+        { key = "topology.kubernetes.io/zone", operator = "In", values = ["eu-west-1a", "eu-west-1b", "eu-west-1c"] },
+        { key = "karpenter.k8s.aws/instance-category", operator = "In", values = ["t", "c", "m", "r"] },
+        { key = "karpenter.k8s.aws/instance-generation", operator = "Gt", values = ["2"] }
+      ]
+      limits = {
+        cpu    = "50"
+        memory = "100Gi"
+      }
+      taints = [{
+        key    = "workload"
+        value  = "critical"
+        effect = "NoSchedule"
+      }]
+      disruption = {
+        consolidationPolicy = "WhenEmpty"
+        consolidateAfter    = "300s"
+        budgets             = [{ nodes = "10%" }]
+      }
+    }
+  }
+
   tags = {
     Environment = "prod"
     ManagedBy   = "Terraform"

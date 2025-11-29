@@ -19,7 +19,6 @@ include:
   - local: ".gitlab/ci/templates.yml"
 
 variables:
-  TF_ROOT: "${CI_PROJECT_DIR}/aws/environments"
   AWS_DEFAULT_REGION: us-east-1
   TF_IN_AUTOMATION: "true"
 
@@ -63,8 +62,7 @@ lint:
   stage: validate
   image: ghcr.io/terraform-linters/tflint
   script:
-    - cd ${TF_ROOT}/${ENV_DIR}
-    - tflint --recursive
+    - tflint --chdir=aws/environments/${ENV_DIR} --recursive
   allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"

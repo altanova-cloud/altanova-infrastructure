@@ -1,12 +1,4 @@
 # -------------------------
-# GLOBAL VARIABLES
-# -------------------------
-variables:
-  TF_ROOT: "${CI_PROJECT_DIR}/aws/environments"
-  AWS_DEFAULT_REGION: us-east-1
-  TF_IN_AUTOMATION: "true"
-
-# -------------------------
 # AWS OIDC AUTH TEMPLATE
 # -------------------------
 .aws_auth_script: &aws_auth_script
@@ -32,11 +24,12 @@ variables:
   cache:
     key: "${CI_COMMIT_REF_SLUG}-${ENV_DIR}"
     paths:
-      - ${TF_ROOT}/${ENV_DIR}/.terraform.lock.hcl   # KEEP ONLY LOCK FILE
+      - aws/environments/${ENV_DIR}/.terraform.lock.hcl   # KEEP ONLY LOCK FILE
   id_tokens:
     GITLAB_OIDC_TOKEN:
       aud: https://gitlab.com
   before_script:
+    - export TF_ROOT="${CI_PROJECT_DIR}/aws/environments"
     - *aws_auth_script
     - cd ${TF_ROOT}/${ENV_DIR}
     - |
@@ -53,6 +46,7 @@ variables:
 .assume_deploy_role:
   extends: .terraform
   before_script:
+    - export TF_ROOT="${CI_PROJECT_DIR}/aws/environments"
     - *aws_auth_script  # Get initial OIDC credentials
     - |
       if [ -n "$DEPLOY_ROLE_ARN" ]; then

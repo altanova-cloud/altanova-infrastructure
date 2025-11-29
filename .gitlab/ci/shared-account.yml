@@ -1,0 +1,96 @@
+# -------------------------
+# SHARED ACCOUNT PIPELINE
+# -------------------------
+# This pipeline manages the foundational infrastructure in the shared account:
+# - IAM roles (GitLabRunnerRole, TerraformStateAccessRole)
+# - S3 state bucket
+# - DynamoDB lock table
+# - GitLab OIDC provider
+#
+# IMPORTANT: This pipeline only runs when shared-account files change
+# to prevent unnecessary runs and reduce risk to backend infrastructure.
+
+include:
+  - local: ".gitlab/ci/templates.yml"
+
+variables:
+  AWS_DEFAULT_REGION: us-east-1
+  TF_IN_AUTOMATION: "true"
+
+stages:
+  - validate
+  - plan
+  - approve
+  - apply
+
+# -------------------------
+# VALIDATION JOBS
+# -------------------------
+shared-fmt:
+  extends: .terraform
+  stage: validate
+  variables:
+    ENV_DIR: shared-account
+  script:
+    - terraform fmt -check -recursive
+  rules:
+    - when: always
+
+shared-lint:
+  stage: validate
+  image: ghcr.io/terraform-linters/tflint
+  variables:
+    ENV_DIR: shared-account
+  script:
+    - tflint --chdir=aws/environments/${ENV_DIR} --recursive
+  allow_failure: true
+  rules:
+    - when: always
+
+shared-validate:
+  extends: .terraform
+  stage: validate
+  variables:
+    ENV_DIR: shared-account
+  needs:
+    - shared-fmt
+    - shared-lint
+  script:
+    - terraform validate
+  rules:
+    - when: always
+
+# -------------------------
+# PLAN JOB
+# -------------------------
+shared-plan:
+  extends: .plan_template
+  variables:
+    ENV_DIR: shared-account
+  rules:
+    - when: always
+
+# -------------------------
+# APPROVE JOB
+# -------------------------
+shared-approve:
+  extends: .approve_template
+  rules:
+    - when: manual
+  variables:
+    ENV_DIR: shared-account
+  needs: [shared-plan]
+
+# -------------------------
+# APPLY JOB
+# -------------------------
+shared-apply:
+  extends: .terraform
+  stage: apply
+  rules:
+    - when: manual
+  variables:
+    ENV_DIR: shared-account
+  needs: [shared-plan, shared-approve]
+  script:
+    - terraform apply -auto-approve tfplan

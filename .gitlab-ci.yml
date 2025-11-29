@@ -16,74 +16,31 @@ workflow:
 
 include:
   - local: ".gitlab/ci/security.yml"
+  - local: ".gitlab/ci/templates.yml"
 
 variables:
-  TF_ROOT: "${CI_PROJECT_DIR}/aws/environments"
   AWS_DEFAULT_REGION: us-east-1
   TF_IN_AUTOMATION: "true"
 
-# -------------------------
-# AWS OIDC AUTH TEMPLATE
-# -------------------------
-.aws_auth_script: &aws_auth_script
-  - apk add --no-cache aws-cli jq
-  - >
-    aws_sts_output=$(aws sts assume-role-with-web-identity \
-      --role-arn "${AWS_ROLE_ARN}" \
-      --role-session-name "GitLabRunner-${CI_PROJECT_ID}-${CI_PIPELINE_ID}" \
-      --web-identity-token "${GITLAB_OIDC_TOKEN}" \
-      --duration-seconds 3600 \
-      --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
-      --output text)
-  - export $(printf "AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s AWS_SESSION_TOKEN=%s" $aws_sts_output)
-
 
 # -------------------------
-# TERRAFORM TEMPLATE
+# SHARED INFRASTRUCTURE PIPELINE (Child)
 # -------------------------
-.terraform:
-  image:
-    name: hashicorp/terraform:1.8
-    entrypoint: [""]
-  cache:
-    key: "${CI_COMMIT_REF_SLUG}-${ENV_DIR}"
-    paths:
-      - ${TF_ROOT}/${ENV_DIR}/.terraform.lock.hcl   # KEEP ONLY LOCK FILE
-  id_tokens:
-    GITLAB_OIDC_TOKEN:
-      aud: https://gitlab.com
-  before_script:
-    - *aws_auth_script
-    - cd ${TF_ROOT}/${ENV_DIR}
-    - |
-      if [ -f backend.conf ]; then
-        terraform init -backend-config=backend.conf -reconfigure
-      else
-        terraform init -reconfigure
-      fi
-
-
-
-# -------------------------
-# TERRAFORM DEPLOY ROLE TEMPLATE
-# -------------------------
-.assume_deploy_role:
-  extends: .terraform
-  before_script:
-    - *aws_auth_script
-    - |
-      if [ -n "$DEPLOY_ROLE_ARN" ]; then
-        echo "Assuming deploy role: $DEPLOY_ROLE_ARN"
-        deploy_creds=$(aws sts assume-role \
-          --role-arn "$DEPLOY_ROLE_ARN" \
-          --role-session-name "Deploy-${ENV_DIR}-${CI_PIPELINE_ID}" \
-          --duration-seconds 3600 \
-          --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
-          --output text)
-        export $(printf "AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s AWS_SESSION_TOKEN=%s" $deploy_creds)
-      fi
-    - cd ${TF_ROOT}/${ENV_DIR}
-    - terraform init -backend-config=backend.conf
+shared-infra-pipeline:
+  stage: plan
+  trigger:
+    include: .gitlab/ci/shared-account.yml
+    strategy: depend
+  needs: []
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - aws/environments/shared-account/**/*
+        - aws/modules/bootstrap/**/*
+    - if: $CI_COMMIT_BRANCH == "master"
+      changes:
+        - aws/environments/shared-account/**/*
+        - aws/modules/bootstrap/**/*
 
 
 # -------------------------
@@ -99,21 +56,20 @@ fmt:
       when: always
   parallel:
     matrix:
-      - ENV_DIR: [shared-account, dev-app-account, prod-app-account]
+      - ENV_DIR: [dev-app-account, prod-app-account]
 
 lint:
   stage: validate
   image: ghcr.io/terraform-linters/tflint
   script:
-    - cd ${TF_ROOT}/${ENV_DIR}
-    - tflint --recursive
+    - tflint --chdir=aws/environments/${ENV_DIR} --recursive
   allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       when: always
   parallel:
     matrix:
-      - ENV_DIR: [shared-account, dev-app-account, prod-app-account]
+      - ENV_DIR: [dev-app-account, prod-app-account]
 
 validate:
   extends: .terraform
@@ -128,33 +84,13 @@ validate:
       when: always
   parallel:
     matrix:
-      - ENV_DIR: [shared-account, dev-app-account, prod-app-account]
+      - ENV_DIR: [dev-app-account, prod-app-account]
 
 
 # -------------------------
 # PLAN JOB (matrix)
 # -------------------------
-.plan_template:
-  extends: .terraform
-  stage: plan
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: always
-    - if: $CI_COMMIT_BRANCH == "master"
-      when: always
-  script:
-    - terraform plan -out=tfplan | tee plan.txt
-    - terraform show -no-color tfplan > plan-readable.txt
-  artifacts:
-    paths:
-      - aws/environments/*/tfplan
-      - aws/environments/*/plan-readable.txt
-    expire_in: 7 days
 
-shared-plan:
-  extends: .plan_template
-  variables:
-    ENV_DIR: shared-account
 
 dev-plan:
   extends: .assume_deploy_role
@@ -185,11 +121,12 @@ infracost:
   image:
     name: infracost/infracost:latest
     entrypoint: [""]
+  allow_failure: true
   parallel:
     matrix:
-      - ENV_DIR: [shared-account, dev-app-account, prod-app-account]
+      - ENV_DIR: [dev-app-account, prod-app-account]
   script:
-    - cd ${TF_ROOT}/${ENV_DIR}
+    - cd aws/environments/${ENV_DIR}
     - infracost breakdown --path . --format json --out-file infracost.json
   artifacts:
     paths:
@@ -203,21 +140,7 @@ infracost:
 # -------------------------
 # APPROVE + APPLY
 # -------------------------
-.approve_template:
-  stage: approve
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master"
-      when: manual
-  script:
-    - echo "Reviewing plan for ${ENV_DIR}"
-    - cd ${TF_ROOT}/${ENV_DIR}
-    - cat plan-readable.txt || echo "No plan found"
 
-shared-approve:
-  extends: .approve_template
-  variables:
-    ENV_DIR: shared-account
-  needs: [shared-plan]
 
 dev-approve:
   extends: .approve_template
@@ -231,20 +154,7 @@ prod-approve:
     ENV_DIR: prod-app-account
   needs: [prod-plan]
 
-.apply_template:
-  extends: .assume_deploy_role
-  stage: apply
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master"
-      when: manual
-  script:
-    - terraform apply -auto-approve tfplan
 
-shared-apply:
-  extends: .apply_template
-  variables:
-    ENV_DIR: shared-account
-  needs: [shared-plan, shared-approve]
 
 dev-apply:
   extends: .apply_template

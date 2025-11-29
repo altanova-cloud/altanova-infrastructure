@@ -81,6 +81,18 @@ variable "enable_karpenter" {
   default     = true
 }
 
+variable "karpenter_node_pools" {
+  description = "Map of Karpenter NodePool configurations"
+  type        = any
+  default     = {}
+}
+
+variable "karpenter_node_class_config" {
+  description = "Configuration for the default Karpenter EC2NodeClass"
+  type        = any
+  default     = {}
+}
+
 variable "enable_aws_efs_csi_driver" {
   description = "Enable AWS EFS CSI Driver"
   type        = bool

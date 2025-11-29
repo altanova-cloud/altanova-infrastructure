@@ -13,6 +13,28 @@ A wrapper module around AWS EKS Blueprints for standardized Kubernetes cluster d
 - ✅ Security best practices
 - ✅ CloudWatch logging
 
+## Prerequisites
+
+### VPC Tagging for Karpenter
+
+**IMPORTANT**: If you enable Karpenter (`enable_karpenter = true`), your VPC subnets and security groups **MUST** be tagged for Karpenter discovery:
+
+```hcl
+# Required tags on private subnets
+tags = {
+  "karpenter.sh/discovery" = var.cluster_name  # Must match your cluster name
+}
+
+# Required tags on node security group (automatically added by this module)
+tags = {
+  "karpenter.sh/discovery" = var.cluster_name
+}
+```
+
+**If these tags are missing, Karpenter will fail to provision nodes.**
+
+See your VPC module configuration to ensure these tags are applied.
+
 ## Usage
 
 ### Basic Example (Dev Environment)
@@ -131,10 +153,13 @@ module "eks" {
 | node_groups | Node group definitions | any | {} | no |
 | enable_aws_load_balancer_controller | Enable ALB Controller (AWS recommended) | bool | true | no |
 | enable_metrics_server | Enable Metrics Server | bool | true | no |
-| enable_cluster_autoscaler | Enable Cluster Autoscaler | bool | true | no |
+| enable_karpenter | Enable Karpenter (recommended for cost optimization) | bool | true | no |
+| enable_cluster_autoscaler | Enable Cluster Autoscaler (legacy, use Karpenter instead) | bool | false | no |
+| enable_gateway_api | Enable Gateway API (successor to Ingress) | bool | true | no |
 | enable_aws_for_fluentbit | Enable Fluent Bit logging | bool | false | no |
 | enable_argocd | Enable ArgoCD | bool | false | no |
 | enable_kube_prometheus_stack | Enable Prometheus/Grafana | bool | false | no |
+| enable_aws_efs_csi_driver | Enable EFS CSI Driver | bool | false | no |
 
 ## Outputs
 
@@ -167,6 +192,54 @@ module "eks" {
 - **ArgoCD** - GitOps deployment
 - **Kube Prometheus Stack** - Monitoring (Prometheus + Grafana)
 - **EFS CSI Driver** - EFS volume support
+
+## Autoscaling: Karpenter vs Cluster Autoscaler
+
+**⚠️ IMPORTANT: Choose ONE autoscaling solution, not both!**
+
+### Karpenter (Recommended) ✅
+
+**Use Karpenter if:**
+- You want **up to 60% cost savings** through intelligent instance selection
+- You need **faster node provisioning** (seconds vs minutes)
+- You want **automatic instance type optimization**
+- You're building a new cluster or can migrate workloads
+
+**Benefits:**
+- Automatically selects the best instance type for your workload
+- Supports Spot instances with intelligent fallback
+- Provisions nodes in ~30 seconds (vs 3-5 minutes with CA)
+- Consolidates underutilized nodes automatically
+- No need to manage multiple node groups
+
+**Setup:**
+```hcl
+enable_karpenter          = true
+enable_cluster_autoscaler = false
+
+# Minimal node group ONLY for system components (Karpenter controller itself)
+node_groups = {
+  system = {
+    instance_types = ["t3.small"]
+    min_size       = 1
+    max_size       = 2
+    desired_size   = 1
+  }
+}
+```
+
+### Cluster Autoscaler (Legacy)
+
+**Use Cluster Autoscaler if:**
+- You have existing infrastructure that's hard to migrate
+- You need a proven, stable solution with years of production use
+- Your organization has strict policies against newer tools
+
+**Limitations:**
+- Slower scaling (3-5 minutes)
+- Requires pre-defined node groups
+- Less cost-efficient
+- More complex configuration for multiple instance types
 
 ### Why Gateway API?
 

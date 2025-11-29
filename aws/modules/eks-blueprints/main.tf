@@ -103,10 +103,10 @@ module "eks" {
   }
 
   # Cluster encryption
-  cluster_encryption_config = var.enable_cluster_encryption ? {
+  cluster_encryption_config = var.enable_cluster_encryption ? [{
     resources        = ["secrets"]
     provider_key_arn = var.kms_key_arn
-  } : null
+  }] : []
 
   # CloudWatch logging
   cluster_enabled_log_types = var.cluster_enabled_log_types
@@ -114,9 +114,10 @@ module "eks" {
   tags = merge(
     var.tags,
     {
-      Environment = var.environment
-      ManagedBy   = "Terraform"
-      Cluster     = var.cluster_name
+      Environment              = var.environment
+      ManagedBy                = "Terraform"
+      Cluster                  = var.cluster_name
+      "karpenter.sh/discovery" = var.cluster_name # Required for Karpenter subnet/SG discovery
     }
   )
 }
@@ -153,15 +154,8 @@ module "eks_blueprints_addons" {
   # Ingress - Modern approach with Gateway API
   # AWS Load Balancer Controller supports both Ingress and Gateway API
   aws_load_balancer_controller = var.enable_aws_load_balancer_controller ? {
-    enable_service_monitor = true
-    # Enable Gateway API support
-    set = [
-      {
-        name  = "enableServiceMutatorWebhook"
-        value = "false"
-      }
-    ]
-  } : null
+    enable_service_monitor = var.enable_kube_prometheus_stack # Only enable if Prometheus is enabled
+  } : {}
 
   # Gateway API CRDs (if enabled)
   # Note: Gateway API is the successor to Ingress

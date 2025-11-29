@@ -4,7 +4,6 @@ module "vpc" {
   source = "../../modules/vpc"
 
   environment         = "prod"
-  cluster_name        = "altanova"
   vpc_cidr            = "10.1.0.0/16" # Prod uses 10.1.x.x
   availability_zone_a = "eu-west-1a"
   availability_zone_b = "eu-west-1b"
@@ -19,8 +18,10 @@ module "vpc" {
   # Database subnets are created by default when using this module
 
   # Enable VPC Flow Logs for security and compliance
-  # Note: Module uses single NAT gateway by default for cost optimization
   enable_flow_logs = true
+
+  # High Availability: Use one NAT Gateway per AZ for production
+  single_nat_gateway = false
 
   tags = {
     Environment = "prod"

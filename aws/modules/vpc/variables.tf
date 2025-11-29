@@ -3,11 +3,6 @@ variable "environment" {
   description = "Environment name"
 }
 
-variable "cluster_name" {
-  type        = string
-  description = "EKS cluster name"
-}
-
 variable "vpc_cidr" {
   type    = string
   default = "10.0.0.0/16"
@@ -34,6 +29,12 @@ variable "enable_database_subnets" {
 variable "enable_flow_logs" {
   type    = bool
   default = true
+}
+
+variable "single_nat_gateway" {
+  description = "Provision a single NAT Gateway (true) or one per AZ (false). Use true for dev/cost-saving, false for prod/HA."
+  type        = bool
+  default     = true
 }
 
 variable "tags" {

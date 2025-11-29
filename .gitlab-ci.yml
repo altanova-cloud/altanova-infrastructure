@@ -140,6 +140,8 @@ validate:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       when: always
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: always
   script:
     - terraform plan -out=tfplan | tee plan.txt
     - terraform show -no-color tfplan > plan-readable.txt

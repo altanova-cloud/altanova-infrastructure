@@ -103,10 +103,10 @@ module "eks" {
   }
 
   # Cluster encryption
-  cluster_encryption_config = var.enable_cluster_encryption ? {
+  cluster_encryption_config = var.enable_cluster_encryption ? [{
     resources        = ["secrets"]
     provider_key_arn = var.kms_key_arn
-  } : null
+  }] : []
 
   # CloudWatch logging
   cluster_enabled_log_types = var.cluster_enabled_log_types
@@ -169,7 +169,7 @@ module "eks_blueprints_addons" {
       cluster_name = var.cluster_name
       region       = data.aws_region.current.name
     })]
-  } : {}
+  } : null
 
   # GitOps
   enable_argocd = var.enable_argocd

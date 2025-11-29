@@ -30,6 +30,7 @@ shared-infra-pipeline:
   trigger:
     include: .gitlab/ci/shared-account.yml
     strategy: depend
+  needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:

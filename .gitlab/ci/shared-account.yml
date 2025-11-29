@@ -13,6 +13,12 @@
 include:
   - local: ".gitlab/ci/templates.yml"
 
+stages:
+  - validate
+  - plan
+  - approve
+  - apply
+
 # -------------------------
 # VALIDATION JOBS
 # -------------------------

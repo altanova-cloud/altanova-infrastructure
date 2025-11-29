@@ -6,6 +6,9 @@
 # - S3 state bucket
 # - DynamoDB lock table
 # - GitLab OIDC provider
+#
+# IMPORTANT: This pipeline only runs when shared-account files change
+# to prevent unnecessary runs and reduce risk to backend infrastructure.
 
 # -------------------------
 # VALIDATION JOBS
@@ -19,6 +22,14 @@ shared-fmt:
     - terraform fmt -check -recursive
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - aws/environments/shared-account/**/*
+        - aws/modules/bootstrap/**/*
+      when: always
+    - if: $CI_COMMIT_BRANCH == "master"
+      changes:
+        - aws/environments/shared-account/**/*
+        - aws/modules/bootstrap/**/*
       when: always
 
 shared-lint:
@@ -32,6 +43,14 @@ shared-lint:
   allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - aws/environments/shared-account/**/*
+        - aws/modules/bootstrap/**/*
+      when: always
+    - if: $CI_COMMIT_BRANCH == "master"
+      changes:
+        - aws/environments/shared-account/**/*
+        - aws/modules/bootstrap/**/*
       when: always
 
 shared-validate:
@@ -46,6 +65,14 @@ shared-validate:
     - terraform validate
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - aws/environments/shared-account/**/*
+        - aws/modules/bootstrap/**/*
+      when: always
+    - if: $CI_COMMIT_BRANCH == "master"
+      changes:
+        - aws/environments/shared-account/**/*
+        - aws/modules/bootstrap/**/*
       when: always
 
 # -------------------------
@@ -55,6 +82,17 @@ shared-plan:
   extends: .plan_template
   variables:
     ENV_DIR: shared-account
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - aws/environments/shared-account/**/*
+        - aws/modules/bootstrap/**/*
+      when: always
+    - if: $CI_COMMIT_BRANCH == "master"
+      changes:
+        - aws/environments/shared-account/**/*
+        - aws/modules/bootstrap/**/*
+      when: always
 
 # -------------------------
 # APPROVE JOB
@@ -63,8 +101,14 @@ shared-approve:
   extends: .approve_template
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - aws/environments/shared-account/**/*
+        - aws/modules/bootstrap/**/*
       when: manual
     - if: $CI_COMMIT_BRANCH == "master"
+      changes:
+        - aws/environments/shared-account/**/*
+        - aws/modules/bootstrap/**/*
       when: manual
   variables:
     ENV_DIR: shared-account
@@ -78,8 +122,14 @@ shared-apply:
   stage: apply
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - aws/environments/shared-account/**/*
+        - aws/modules/bootstrap/**/*
       when: manual
     - if: $CI_COMMIT_BRANCH == "master"
+      changes:
+        - aws/environments/shared-account/**/*
+        - aws/modules/bootstrap/**/*
       when: manual
   variables:
     ENV_DIR: shared-account

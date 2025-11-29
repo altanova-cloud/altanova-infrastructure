@@ -155,7 +155,7 @@ module "eks_blueprints_addons" {
   # AWS Load Balancer Controller supports both Ingress and Gateway API
   aws_load_balancer_controller = var.enable_aws_load_balancer_controller ? {
     enable_service_monitor = var.enable_kube_prometheus_stack # Only enable if Prometheus is enabled
-  } : null
+  } : {}
 
   # Gateway API CRDs (if enabled)
   # Note: Gateway API is the successor to Ingress
@@ -169,7 +169,7 @@ module "eks_blueprints_addons" {
       cluster_name = var.cluster_name
       region       = data.aws_region.current.name
     })]
-  } : null
+  } : {}
 
   # GitOps
   enable_argocd = var.enable_argocd

@@ -70,7 +70,7 @@ variables:
 .assume_deploy_role:
   extends: .terraform
   before_script:
-    - *aws_auth_script
+    - *aws_auth_script  # Get initial OIDC credentials
     - |
       if [ -n "$DEPLOY_ROLE_ARN" ]; then
         echo "Assuming deploy role: $DEPLOY_ROLE_ARN"
@@ -83,7 +83,12 @@ variables:
         export $(printf "AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s AWS_SESSION_TOKEN=%s" $deploy_creds)
       fi
     - cd ${TF_ROOT}/${ENV_DIR}
-    - terraform init -backend-config=backend.conf
+    - |
+      if [ -f backend.conf ]; then
+        terraform init -backend-config=backend.conf -reconfigure
+      else
+        terraform init -reconfigure
+      fi
 
 
 # -------------------------

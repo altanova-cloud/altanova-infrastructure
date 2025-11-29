@@ -16,6 +16,7 @@ workflow:
 
 include:
   - local: ".gitlab/ci/security.yml"
+  - local: ".gitlab/ci/shared-account.yml"
 
 variables:
   TF_ROOT: "${CI_PROJECT_DIR}/aws/environments"
@@ -104,7 +105,7 @@ fmt:
       when: always
   parallel:
     matrix:
-      - ENV_DIR: [shared-account, dev-app-account, prod-app-account]
+      - ENV_DIR: [dev-app-account, prod-app-account]
 
 lint:
   stage: validate
@@ -118,7 +119,7 @@ lint:
       when: always
   parallel:
     matrix:
-      - ENV_DIR: [shared-account, dev-app-account, prod-app-account]
+      - ENV_DIR: [dev-app-account, prod-app-account]
 
 validate:
   extends: .terraform
@@ -133,7 +134,7 @@ validate:
       when: always
   parallel:
     matrix:
-      - ENV_DIR: [shared-account, dev-app-account, prod-app-account]
+      - ENV_DIR: [dev-app-account, prod-app-account]
 
 
 # -------------------------
@@ -155,11 +156,6 @@ validate:
       - aws/environments/*/tfplan
       - aws/environments/*/plan-readable.txt
     expire_in: 7 days
-
-shared-plan:
-  extends: .plan_template
-  variables:
-    ENV_DIR: shared-account
 
 dev-plan:
   extends: .assume_deploy_role
@@ -193,7 +189,7 @@ infracost:
   allow_failure: true
   parallel:
     matrix:
-      - ENV_DIR: [shared-account, dev-app-account, prod-app-account]
+      - ENV_DIR: [dev-app-account, prod-app-account]
   script:
     - cd ${TF_ROOT}/${ENV_DIR}
     - infracost breakdown --path . --format json --out-file infracost.json
@@ -219,17 +215,6 @@ infracost:
     - cd ${TF_ROOT}/${ENV_DIR}
     - cat plan-readable.txt || echo "No plan found"
 
-shared-approve:
-  extends: .approve_template
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: manual
-    - if: $CI_COMMIT_BRANCH == "master"
-      when: manual
-  variables:
-    ENV_DIR: shared-account
-  needs: [shared-plan]
-
 dev-approve:
   extends: .approve_template
   variables:
@@ -248,20 +233,6 @@ prod-approve:
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
       when: manual
-  script:
-    - terraform apply -auto-approve tfplan
-
-shared-apply:
-  extends: .terraform
-  stage: apply
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: manual
-    - if: $CI_COMMIT_BRANCH == "master"
-      when: manual
-  variables:
-    ENV_DIR: shared-account
-  needs: [shared-plan, shared-approve]
   script:
     - terraform apply -auto-approve tfplan
 

@@ -12,7 +12,7 @@ resource "kubernetes_manifest" "karpenter_node_class" {
       name = "default"
     }
     spec = {
-      amiFamily = "Ubuntu"
+      amiFamily = "AL2023" # Amazon Linux 2023 - AWS recommended for EKS
       role      = module.eks_blueprints_addons.karpenter.node_iam_role_name
 
       subnetSelectorTerms = [{
@@ -78,14 +78,9 @@ resource "kubernetes_manifest" "karpenter_node_pool" {
         spec = {
           requirements = [
             {
-              key      = "node.kubernetes.io/instance-type"
-              operator = "In"
-              values   = ["t3.medium", "t3a.medium"]
-            },
-            {
               key      = "karpenter.sh/capacity-type"
               operator = "In"
-              values   = ["spot", "on-demand"]
+              values   = var.environment == "prod" ? ["on-demand"] : ["spot", "on-demand"]
             },
             {
               key      = "kubernetes.io/arch"
@@ -96,6 +91,16 @@ resource "kubernetes_manifest" "karpenter_node_pool" {
               key      = "topology.kubernetes.io/zone"
               operator = "In"
               values   = data.aws_availability_zones.available.names
+            },
+            {
+              key      = "karpenter.k8s.aws/instance-category"
+              operator = "In"
+              values   = ["t", "c", "m", "r"] # General purpose, compute, memory optimized
+            },
+            {
+              key      = "karpenter.k8s.aws/instance-generation"
+              operator = "Gt"
+              values   = ["2"] # Only use instance types newer than generation 2
             }
           ]
           nodeClassRef = {

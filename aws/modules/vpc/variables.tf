@@ -36,6 +36,12 @@ variable "enable_flow_logs" {
   default = true
 }
 
+variable "single_nat_gateway" {
+  description = "Provision a single NAT Gateway (true) or one per AZ (false). Use true for dev/cost-saving, false for prod/HA."
+  type        = bool
+  default     = true
+}
+
 variable "tags" {
   type    = map(string)
   default = {}

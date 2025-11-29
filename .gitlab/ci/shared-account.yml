@@ -10,6 +10,9 @@
 # IMPORTANT: This pipeline only runs when shared-account files change
 # to prevent unnecessary runs and reduce risk to backend infrastructure.
 
+include:
+  - local: ".gitlab/ci/templates.yml"
+
 # -------------------------
 # VALIDATION JOBS
 # -------------------------

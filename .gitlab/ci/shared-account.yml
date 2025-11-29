@@ -42,8 +42,7 @@ shared-lint:
   variables:
     ENV_DIR: shared-account
   script:
-    - cd aws/environments/${ENV_DIR}
-    - tflint --recursive
+    - tflint --chdir=aws/environments/${ENV_DIR} --recursive
   allow_failure: true
   rules:
     - when: always

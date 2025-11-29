@@ -190,6 +190,7 @@ infracost:
   image:
     name: infracost/infracost:latest
     entrypoint: [""]
+  allow_failure: true
   parallel:
     matrix:
       - ENV_DIR: [shared-account, dev-app-account, prod-app-account]
@@ -220,6 +221,11 @@ infracost:
 
 shared-approve:
   extends: .approve_template
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: manual
   variables:
     ENV_DIR: shared-account
   needs: [shared-plan]
@@ -246,10 +252,18 @@ prod-approve:
     - terraform apply -auto-approve tfplan
 
 shared-apply:
-  extends: .apply_template
+  extends: .terraform
+  stage: apply
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: manual
   variables:
     ENV_DIR: shared-account
   needs: [shared-plan, shared-approve]
+  script:
+    - terraform apply -auto-approve tfplan
 
 dev-apply:
   extends: .apply_template

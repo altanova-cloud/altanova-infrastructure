@@ -60,6 +60,7 @@ resource "aws_iam_role" "terraform_state_access" {
           AWS = [
             "arn:aws:iam::${var.dev_account_id}:root",
             "arn:aws:iam::${var.prod_account_id}:root",
+            "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/GitLabRunnerRole"
           ]
         }
         Action = "sts:AssumeRole"

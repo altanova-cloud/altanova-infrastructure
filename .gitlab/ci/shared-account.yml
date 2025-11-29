@@ -21,16 +21,7 @@ shared-fmt:
   script:
     - terraform fmt -check -recursive
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - aws/environments/shared-account/**/*
-        - aws/modules/bootstrap/**/*
-      when: always
-    - if: $CI_COMMIT_BRANCH == "master"
-      changes:
-        - aws/environments/shared-account/**/*
-        - aws/modules/bootstrap/**/*
-      when: always
+    - when: always
 
 shared-lint:
   stage: validate
@@ -42,16 +33,7 @@ shared-lint:
     - tflint --recursive
   allow_failure: true
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - aws/environments/shared-account/**/*
-        - aws/modules/bootstrap/**/*
-      when: always
-    - if: $CI_COMMIT_BRANCH == "master"
-      changes:
-        - aws/environments/shared-account/**/*
-        - aws/modules/bootstrap/**/*
-      when: always
+    - when: always
 
 shared-validate:
   extends: .terraform
@@ -64,16 +46,7 @@ shared-validate:
   script:
     - terraform validate
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - aws/environments/shared-account/**/*
-        - aws/modules/bootstrap/**/*
-      when: always
-    - if: $CI_COMMIT_BRANCH == "master"
-      changes:
-        - aws/environments/shared-account/**/*
-        - aws/modules/bootstrap/**/*
-      when: always
+    - when: always
 
 # -------------------------
 # PLAN JOB
@@ -83,16 +56,7 @@ shared-plan:
   variables:
     ENV_DIR: shared-account
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - aws/environments/shared-account/**/*
-        - aws/modules/bootstrap/**/*
-      when: always
-    - if: $CI_COMMIT_BRANCH == "master"
-      changes:
-        - aws/environments/shared-account/**/*
-        - aws/modules/bootstrap/**/*
-      when: always
+    - when: always
 
 # -------------------------
 # APPROVE JOB
@@ -100,16 +64,7 @@ shared-plan:
 shared-approve:
   extends: .approve_template
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - aws/environments/shared-account/**/*
-        - aws/modules/bootstrap/**/*
-      when: manual
-    - if: $CI_COMMIT_BRANCH == "master"
-      changes:
-        - aws/environments/shared-account/**/*
-        - aws/modules/bootstrap/**/*
-      when: manual
+    - when: manual
   variables:
     ENV_DIR: shared-account
   needs: [shared-plan]
@@ -121,16 +76,7 @@ shared-apply:
   extends: .terraform
   stage: apply
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - aws/environments/shared-account/**/*
-        - aws/modules/bootstrap/**/*
-      when: manual
-    - if: $CI_COMMIT_BRANCH == "master"
-      changes:
-        - aws/environments/shared-account/**/*
-        - aws/modules/bootstrap/**/*
-      when: manual
+    - when: manual
   variables:
     ENV_DIR: shared-account
   needs: [shared-plan, shared-approve]

@@ -15,43 +15,45 @@ The shared account hosts **critical backend infrastructure**:
 **Changes to this infrastructure are high-risk** and could break deployments across all environments.
 
 ## How It Works
-
-### Path-Based Triggers
-The shared account pipeline **only runs** when files in these paths change:
-- `aws/environments/shared-account/**/*`
-- `aws/modules/bootstrap/**/*`
-
-### What This Means
-
-✅ **Normal app changes** (dev/prod VPC, EKS, etc.) → Shared pipeline **does not run**
-
-✅ **Backend changes** (IAM roles, S3 bucket, etc.) → Shared pipeline **runs automatically**
-
-✅ **Reduced risk** - Backend infrastructure isn't touched unless necessary
-
-✅ **Faster pipelines** - No unnecessary validation/planning for unchanged infrastructure
-
-## Pipeline Flow
-
-### When Shared Account Files Change:
-
-**On Merge Request:**
-```
-shared-fmt → shared-lint → shared-validate → shared-plan
-                                                  ↓
-                                            shared-approve (manual)
-                                                  ↓
-                                            shared-apply (manual)
-```
-
-**On Master Branch:**
-```
-shared-plan → shared-approve (manual) → shared-apply (manual)
-```
-
-### When Only App Account Files Change:
-
-**Shared pipeline does not run at all** ✅
+ 
+ ### Child Pipeline Architecture
+-The shared account pipeline is implemented as a **Child Pipeline**.
+-
+-1. **Main Pipeline** (`.gitlab-ci.yml`) has a trigger job: `shared-infra-pipeline`
+-2. This job checks for changes in:
+-   - `aws/environments/shared-account/**/*`
+-   - `aws/modules/bootstrap/**/*`
+-3. If changes are detected, it triggers the **Child Pipeline** defined in `.gitlab/ci/shared-account.yml`
+-
+-### What This Means
+-
+-✅ **Clean Main Pipeline** - You only see one job (`shared-infra-pipeline`) instead of many shared jobs cluttering the view
+-
+-✅ **Visual Separation** - Click on the downstream pipeline to see the detailed shared account jobs
+-
+-✅ **Automatic Protection** - The child pipeline is only created when backend files change
+-
+-## Pipeline Flow
+-
+-### When Shared Account Files Change:
+-
+-**Main Pipeline:**
+-```
+-shared-infra-pipeline (Trigger) ---------------------> [Child Pipeline Created]
+-```
+-
+-**Child Pipeline (Downstream):**
+-```
+-shared-fmt → shared-lint → shared-validate → shared-plan
+-                                                  ↓
+-                                            shared-approve (manual)
+-                                                  ↓
+-                                            shared-apply (manual)
+-```
+-
+-### When Only App Account Files Change:
+-
+-**Trigger job does not run** → Child pipeline is not created ✅
 
 ## Manual Override
 

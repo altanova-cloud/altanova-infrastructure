@@ -16,9 +16,6 @@ locals {
     var.availability_zone_b,
     var.availability_zone_c
   ])
-
-  # DB subnet numbering (2 or 3 depending on AZ count)
-  db_cidr_numbers = var.availability_zone_c != null ? [20, 21, 22] : [20, 21]
 }
 
 module "vpc" {
@@ -33,12 +30,19 @@ module "vpc" {
   # -----------------------------
   # Subnets (simple, predictable)
   # -----------------------------
-  public_subnets  = cidrsubnets(var.vpc_cidr, 8, 1, 2, 3)
-  private_subnets = cidrsubnets(var.vpc_cidr, 8, 10, 11, 12)
+  # For a /16 VPC, adding 8 bits gives /24 subnets
+  # Using netnum to control the third octet: 10.x.netnum.0/24
+  public_subnets = [
+    for i in range(length(local.azs)) : cidrsubnet(var.vpc_cidr, 8, i + 1)
+  ]
+  
+  private_subnets = [
+    for i in range(length(local.azs)) : cidrsubnet(var.vpc_cidr, 8, i + 10)
+  ]
 
   database_subnets = (
     var.enable_database_subnets ?
-      cidrsubnets(var.vpc_cidr, 8, local.db_cidr_numbers...) :
+      [for i in range(length(local.azs)) : cidrsubnet(var.vpc_cidr, 8, i + 20)] :
       []
   )
 

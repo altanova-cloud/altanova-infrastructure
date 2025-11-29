@@ -62,7 +62,8 @@ lint:
   stage: validate
   image: ghcr.io/terraform-linters/tflint
   script:
-    - tflint --chdir=aws/environments/${ENV_DIR} --recursive
+    - cd aws/environments/${ENV_DIR}
+    - tflint --recursive
   allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -126,7 +127,7 @@ infracost:
     matrix:
       - ENV_DIR: [dev-app-account, prod-app-account]
   script:
-    - cd ${TF_ROOT}/${ENV_DIR}
+    - cd aws/environments/${ENV_DIR}
     - infracost breakdown --path . --format json --out-file infracost.json
   artifacts:
     paths:

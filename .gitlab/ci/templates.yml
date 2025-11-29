@@ -1,4 +1,12 @@
 # -------------------------
+# GLOBAL VARIABLES
+# -------------------------
+variables:
+  TF_ROOT: "${CI_PROJECT_DIR}/aws/environments"
+  AWS_DEFAULT_REGION: us-east-1
+  TF_IN_AUTOMATION: "true"
+
+# -------------------------
 # AWS OIDC AUTH TEMPLATE
 # -------------------------
 .aws_auth_script: &aws_auth_script

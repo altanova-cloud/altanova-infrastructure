@@ -4,7 +4,6 @@ module "vpc" {
   source = "../../modules/vpc"
 
   environment         = "dev"
-  cluster_name        = "altanova"
   vpc_cidr            = "10.0.0.0/16"
   availability_zone_a = "eu-west-1a"
   availability_zone_b = "eu-west-1b"

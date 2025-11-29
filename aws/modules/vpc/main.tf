@@ -22,7 +22,7 @@ module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "~> 5.0"
 
-  name = "${var.environment}-${var.cluster_name}"
+  name = "${var.environment}-vpc"
   cidr = var.vpc_cidr
 
   azs = local.azs
@@ -61,24 +61,20 @@ module "vpc" {
   flow_log_destination_type             = "cloud-watch-logs"
   create_flow_log_cloudwatch_iam_role   = true
 
-  # Tags for Kubernetes + structure
+  # Tags for structure
   public_subnet_tags = {
-    "kubernetes.io/role/elb" = "1"
     Tier = "Public"
   }
 
   private_subnet_tags = {
-    "kubernetes.io/role/internal-elb" = "1"
-    "karpenter.sh/discovery"          = var.cluster_name
-    Tier                               = "Private"
+    Tier = "Private"
   }
 
   tags = merge(
     var.tags,
     {
-      "kubernetes.io/cluster/${var.cluster_name}" = "owned"
-      Environment                                  = var.environment
-      Provisioner                                  = "Terraform"
+      Environment = var.environment
+      Provisioner = "Terraform"
     }
   )
 }

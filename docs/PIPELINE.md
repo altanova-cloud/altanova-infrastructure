@@ -149,69 +149,69 @@ Phase 4: Advanced Features (Week 5+)
 ### OIDC Authentication Flow
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ GitHub Actions Runner                                       │
-│                                                             │
-│ Repository: altanova-cloud/altanova-infrastructure          │
-│ Branch: master                                              │
-│ Workflow: terraform-shared.yml                              │
-│                                                             │
-│ Step: Configure AWS Credentials                             │
-│   ↓                                                         │
-│ Generate OIDC Token (JWT)                                   │
-│   - iss: https://token.actions.githubusercontent.com        │
-│   - sub: repo:altanova-cloud/altanova-infrastructure:ref:*  │
-│   - aud: sts.amazonaws.com                                  │
-└─────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────┐
+│ GitHub Actions Runner                                             │
+│                                                                   │
+│ Repository: altanova-cloud/altanova-infrastructure                │
+│ Branch: master                                                    │
+│ Workflow: terraform-shared.yml                                    │
+│                                                                   │
+│ Step: Configure AWS Credentials                                   │
+│   ↓                                                               │
+│ Generate OIDC Token (JWT)                                         │
+│   - iss: https://token.actions.githubusercontent.com              │
+│   - sub: repo:altanova-cloud/altanova-infrastructure:ref:*        │
+│   - aud: sts.amazonaws.com                                        │
+└───────────────────────────────────────────────────────────────────┘
                           ↓
                           ↓ HTTPS Request
                           ↓ sts:AssumeRoleWithWebIdentity
                           ↓
-┌─────────────────────────────────────────────────────────────┐
-│ AWS Shared Account (265245191272)                          │
-│                                                             │
-│ ┌─────────────────────────────────────────────────────┐   │
-│ │ GitHub OIDC Provider                                │   │
-│ │ URL: token.actions.githubusercontent.com            │   │
-│ │ Audience: sts.amazonaws.com                         │   │
-│ │ Thumbprint: 6938fd4d98bab03faadb97b34396831e3780aea1│   │
-│ └─────────────────────────────────────────────────────┘   │
-│                          ↓                                  │
-│                   Validate Token                            │
-│                          ↓                                  │
-│ ┌─────────────────────────────────────────────────────┐   │
-│ │ GitHubActionsRole                                   │   │
-│ │ ARN: arn:aws:iam::265245191272:role/GitHubActionsRole│ │
-│ │                                                     │   │
-│ │ Trust Policy:                                       │   │
-│ │   - Federated: GitHub OIDC Provider                │   │
-│ │   - Condition: repo matches                        │   │
-│ │                altanova-cloud/altanova-infrastructure│  │
-│ │                                                     │   │
-│ │ Permissions (Phase 1):                             │   │
-│ │   - S3: altanova-tf-state-eu-central-1 (RW)       │   │
-│ │   - DynamoDB: altanova-terraform-locks (RW)       │   │
-│ │   - IAM: Shared Account resources                 │   │
-│ │   - STS: AssumeRole to TerraformStateAccessRole   │   │
-│ └─────────────────────────────────────────────────────┘   │
-│                          ↓                                  │
-│                Return Temporary Credentials                 │
-│                (Valid for 1 hour)                           │
-└─────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────┐
+│ AWS Shared Account (265245191272)                                │
+│                                                                   │
+│ ┌───────────────────────────────────────────────────────────┐   │
+│ │ GitHub OIDC Provider                                      │   │
+│ │ URL: token.actions.githubusercontent.com                  │   │
+│ │ Audience: sts.amazonaws.com                               │   │
+│ │ Thumbprint: 6938fd4d98bab03faadb97b34396831e3780aea1      │   │
+│ └───────────────────────────────────────────────────────────┘   │
+│                          ↓                                        │
+│                   Validate Token                                  │
+│                          ↓                                        │
+│ ┌───────────────────────────────────────────────────────────┐   │
+│ │ GitHubActionsRole                                         │   │
+│ │ ARN: arn:aws:iam::265245191272:role/GitHubActionsRole     │   │
+│ │                                                           │   │
+│ │ Trust Policy:                                             │   │
+│ │   - Federated: GitHub OIDC Provider                      │   │
+│ │   - Condition: repo matches                              │   │
+│ │                altanova-cloud/altanova-infrastructure     │   │
+│ │                                                           │   │
+│ │ Permissions (Phase 1):                                    │   │
+│ │   - S3: altanova-tf-state-eu-central-1 (RW)              │   │
+│ │   - DynamoDB: altanova-terraform-locks (RW)              │   │
+│ │   - IAM: Shared Account resources                        │   │
+│ │   - STS: AssumeRole to TerraformStateAccessRole          │   │
+│ └───────────────────────────────────────────────────────────┘   │
+│                          ↓                                        │
+│                Return Temporary Credentials                       │
+│                (Valid for 1 hour)                                 │
+└───────────────────────────────────────────────────────────────────┘
                           ↓
-┌─────────────────────────────────────────────────────────────┐
-│ GitHub Actions Runner                                       │
-│                                                             │
-│ AWS_ACCESS_KEY_ID: ASIA...                                  │
-│ AWS_SECRET_ACCESS_KEY: ...                                  │
-│ AWS_SESSION_TOKEN: ...                                      │
-│                                                             │
-│ ↓ Execute Terraform Commands                                │
-│                                                             │
-│ terraform init → Access S3 Backend                          │
-│ terraform plan → Read/Write state                           │
-│ terraform apply → Update infrastructure                     │
-└─────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────┐
+│ GitHub Actions Runner                                             │
+│                                                                   │
+│ AWS_ACCESS_KEY_ID: ASIA...                                        │
+│ AWS_SECRET_ACCESS_KEY: ...                                        │
+│ AWS_SESSION_TOKEN: ...                                            │
+│                                                                   │
+│ ↓ Execute Terraform Commands                                      │
+│                                                                   │
+│ terraform init → Access S3 Backend                                │
+│ terraform plan → Read/Write state                                 │
+│ terraform apply → Update infrastructure                           │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
 ### Key Security Features:
@@ -306,130 +306,131 @@ Trigger Conditions:
 #### Jobs Flow:
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│ Trigger Event                                              │
-│ - PR to master                                             │
-│ - Push to master                                           │
-│ - Manual dispatch                                          │
-└────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│ Trigger Event                                                  │
+│ - PR to master                                                 │
+│ - Push to master                                               │
+│ - Manual dispatch                                              │
+└────────────────────────────────────────────────────────────────┘
                           ↓
-┌────────────────────────────────────────────────────────────┐
-│ Job: terraform-validate                                    │
-│ Runs on: ubuntu-latest                                     │
-│ Timeout: 10 minutes                                        │
-│                                                            │
-│ Steps:                                                     │
-│ 1. Checkout repository                                     │
-│    - uses: actions/checkout@v4                             │
-│                                                            │
-│ 2. Setup Terraform                                         │
-│    - uses: hashicorp/setup-terraform@v3                    │
-│    - version: 1.8.x                                        │
-│                                                            │
-│ 3. Terraform Format Check                                  │
-│    - terraform fmt -check -recursive                       │
-│    - Exit code 1 if not formatted                          │
-│                                                            │
-│ 4. Terraform Init (validation only, no backend)            │
-│    - terraform init -backend=false                         │
-│    - Working dir: aws/environments/shared-account          │
-│                                                            │
-│ 5. Terraform Validate                                      │
-│    - terraform validate                                    │
-│    - Check syntax and configuration                        │
-│                                                            │
-│ Result: ✅ Pass = Continue | ❌ Fail = Stop workflow       │
-└────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│ Job: terraform-validate                                        │
+│ Runs on: ubuntu-latest                                         │
+│ Timeout: 10 minutes                                            │
+│                                                                │
+│ Steps:                                                         │
+│ 1. Checkout repository                                         │
+│    - uses: actions/checkout@v4                                 │
+│                                                                │
+│ 2. Setup Terraform                                             │
+│    - uses: hashicorp/setup-terraform@v3                        │
+│    - version: 1.8.x                                            │
+│                                                                │
+│ 3. Terraform Format Check                                      │
+│    - terraform fmt -check -recursive                           │
+│    - Exit code 1 if not formatted                              │
+│                                                                │
+│ 4. Terraform Init (validation only, no backend)                │
+│    - terraform init -backend=false                             │
+│    - Working dir: aws/environments/shared-account              │
+│                                                                │
+│ 5. Terraform Validate                                          │
+│    - terraform validate                                        │
+│    - Check syntax and configuration                            │
+│                                                                │
+│ Result: ✅ Pass = Continue | ❌ Fail = Stop workflow           │
+└────────────────────────────────────────────────────────────────┘
                           ↓
-┌────────────────────────────────────────────────────────────┐
-│ Job: terraform-plan                                        │
-│ Runs on: ubuntu-latest                                     │
-│ Timeout: 20 minutes                                        │
-│ Needs: terraform-validate                                  │
-│                                                            │
-│ Steps:                                                     │
-│ 1. Checkout repository                                     │
-│    - uses: actions/checkout@v4                             │
-│                                                            │
-│ 2. Configure AWS Credentials (OIDC)                        │
-│    - uses: aws-actions/configure-aws-credentials@v4        │
-│    - role-to-assume: ${{ secrets.AWS_ROLE_ARN }}          │
-│    - aws-region: us-east-1                                 │
-│    - session duration: 3600 seconds                        │
-│                                                            │
-│ 3. Setup Terraform                                         │
-│    - uses: hashicorp/setup-terraform@v3                    │
-│                                                            │
-│ 4. Terraform Init (with backend)                           │
-│    - terraform init -backend-config=backend.conf           │
-│    - Initialize S3 backend                                 │
-│    - Download state file                                   │
-│                                                            │
-│ 5. Terraform Plan                                          │
-│    - terraform plan -out=tfplan -no-color                  │
-│    - Generate execution plan                               │
-│    - Save to tfplan file                                   │
-│                                                            │
-│ 6. Show Plan (human readable)                              │
-│    - terraform show tfplan -no-color                       │
-│    - Capture output                                        │
-│                                                            │
-│ 7. Upload Plan Artifact                                    │
-│    - uses: actions/upload-artifact@v4                      │
-│    - name: tfplan-shared-${{ github.sha }}                │
-│    - retention: 30 days                                    │
-│                                                            │
-│ 8. Comment Plan on PR (if PR event)                        │
-│    - uses: actions/github-script@v7                        │
-│    - Post plan summary as PR comment                       │
-│                                                            │
-│ Result: Plan available for review                          │
-└────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│ Job: terraform-plan                                            │
+│ Runs on: ubuntu-latest                                         │
+│ Timeout: 20 minutes                                            │
+│ Needs: terraform-validate                                      │
+│                                                                │
+│ Steps:                                                         │
+│ 1. Checkout repository                                         │
+│    - uses: actions/checkout@v4                                 │
+│                                                                │
+│ 2. Configure AWS Credentials (OIDC)                            │
+│    - uses: aws-actions/configure-aws-credentials@v4            │
+│    - role-to-assume: ${{ secrets.AWS_ROLE_ARN }}              │
+│    - aws-region: us-east-1                                     │
+│    - session duration: 3600 seconds                            │
+│                                                                │
+│ 3. Setup Terraform                                             │
+│    - uses: hashicorp/setup-terraform@v3                        │
+│                                                                │
+│ 4. Terraform Init (with backend)                               │
+│    - terraform init -backend-config=backend.conf               │
+│    - Initialize S3 backend                                     │
+│    - Download state file                                       │
+│                                                                │
+│ 5. Terraform Plan                                              │
+│    - terraform plan -out=tfplan -no-color                      │
+│    - Generate execution plan                                   │
+│    - Save to tfplan file                                       │
+│                                                                │
+│ 6. Show Plan (human readable)                                  │
+│    - terraform show tfplan -no-color                           │
+│    - Capture output                                            │
+│                                                                │
+│ 7. Upload Plan Artifact                                        │
+│    - uses: actions/upload-artifact@v4                          │
+│    - name: tfplan-shared-${{ github.sha }}                    │
+│    - retention: 30 days                                        │
+│                                                                │
+│ 8. Comment Plan on PR (if PR event)                            │
+│    - uses: actions/github-script@v7                            │
+│    - Post plan summary as PR comment                           │
+│                                                                │
+│ Result: Plan available for review                              │
+└────────────────────────────────────────────────────────────────┘
                           ↓
                      (Manual Review)
                           ↓
                     (PR Merged to master)
                           ↓
-┌────────────────────────────────────────────────────────────┐
-│ Job: terraform-apply                                       │
-│ Runs on: ubuntu-latest                                     │
-│ Timeout: 30 minutes                                        │
-│ Environment: shared-account (with protection rules)        │
-│ Needs: terraform-plan                                      │
-│ If: github.ref == 'refs/heads/master' && github.event_name == 'push' │
-│                                                            │
-│ ⚠️  MANUAL APPROVAL REQUIRED (GitHub Environment)          │
-│     - Requires approval from infra team reviewers          │
-│     - Timeout: 4 hours max wait time                       │
-│                                                            │
-│ Steps:                                                     │
-│ 1. Checkout repository                                     │
-│    - uses: actions/checkout@v4                             │
-│                                                            │
-│ 2. Download Plan Artifact                                  │
-│    - uses: actions/download-artifact@v4                    │
-│    - name: tfplan-shared-${{ github.sha }}                │
-│                                                            │
-│ 3. Configure AWS Credentials (OIDC)                        │
-│    - uses: aws-actions/configure-aws-credentials@v4        │
-│    - role-to-assume: ${{ secrets.AWS_ROLE_ARN }}          │
-│                                                            │
-│ 4. Setup Terraform                                         │
-│    - uses: hashicorp/setup-terraform@v3                    │
-│                                                            │
-│ 5. Terraform Init                                          │
-│    - terraform init -backend-config=backend.conf           │
-│                                                            │
-│ 6. Terraform Apply                                         │
-│    - terraform apply tfplan                                │
-│    - Execute the plan                                      │
-│    - No additional approval needed (already in plan)       │
-│                                                            │
-│ 7. Comment Apply Result                                    │
-│    - Post success/failure to original PR                   │
-│                                                            │
-│ Result: Infrastructure deployed to Shared Account          │
-└────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│ Job: terraform-apply                                           │
+│ Runs on: ubuntu-latest                                         │
+│ Timeout: 30 minutes                                            │
+│ Environment: shared-account (with protection rules)            │
+│ Needs: terraform-plan                                          │
+│ If: github.ref == 'refs/heads/master' && github.event_name == │
+│     'push'                                                     │
+│                                                                │
+│ ⚠️  MANUAL APPROVAL REQUIRED (GitHub Environment)              │
+│     - Requires approval from infra team reviewers              │
+│     - Timeout: 4 hours max wait time                           │
+│                                                                │
+│ Steps:                                                         │
+│ 1. Checkout repository                                         │
+│    - uses: actions/checkout@v4                                 │
+│                                                                │
+│ 2. Download Plan Artifact                                      │
+│    - uses: actions/download-artifact@v4                        │
+│    - name: tfplan-shared-${{ github.sha }}                    │
+│                                                                │
+│ 3. Configure AWS Credentials (OIDC)                            │
+│    - uses: aws-actions/configure-aws-credentials@v4            │
+│    - role-to-assume: ${{ secrets.AWS_ROLE_ARN }}              │
+│                                                                │
+│ 4. Setup Terraform                                             │
+│    - uses: hashicorp/setup-terraform@v3                        │
+│                                                                │
+│ 5. Terraform Init                                              │
+│    - terraform init -backend-config=backend.conf               │
+│                                                                │
+│ 6. Terraform Apply                                             │
+│    - terraform apply tfplan                                    │
+│    - Execute the plan                                          │
+│    - No additional approval needed (already in plan)           │
+│                                                                │
+│ 7. Comment Apply Result                                        │
+│    - Post success/failure to original PR                       │
+│                                                                │
+│ Result: Infrastructure deployed to Shared Account              │
+└────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -678,24 +679,24 @@ Schedule:
 └── Alert: Create GitHub issue if drift detected
 
 Drift Detection Flow:
-┌────────────────────────────────────┐
-│ Scheduled Trigger (daily 9 AM)    │
-└────────────────────────────────────┘
+┌────────────────────────────────────────┐
+│ Scheduled Trigger (daily 9 AM)        │
+└────────────────────────────────────────┘
               ↓
-┌────────────────────────────────────┐
-│ Run terraform plan                 │
-│ - Exit code 0: No changes          │
-│ - Exit code 1: Error               │
-│ - Exit code 2: Drift detected      │
-└────────────────────────────────────┘
+┌────────────────────────────────────────┐
+│ Run terraform plan                     │
+│ - Exit code 0: No changes              │
+│ - Exit code 1: Error                   │
+│ - Exit code 2: Drift detected          │
+└────────────────────────────────────────┘
               ↓
-┌────────────────────────────────────┐
-│ If drift detected:                 │
-│ - Create GitHub Issue              │
-│ - Assign to infra team             │
-│ - Include drift details            │
-│ - Label: drift-detection           │
-└────────────────────────────────────┘
+┌────────────────────────────────────────┐
+│ If drift detected:                     │
+│ - Create GitHub Issue                  │
+│ - Assign to infra team                 │
+│ - Include drift details                │
+│ - Label: drift-detection               │
+└────────────────────────────────────────┘
 ```
 
 ---

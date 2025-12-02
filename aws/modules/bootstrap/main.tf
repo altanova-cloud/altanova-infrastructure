@@ -60,7 +60,7 @@ resource "aws_iam_role" "terraform_state_access" {
           AWS = [
             "arn:aws:iam::${var.dev_account_id}:root",
             "arn:aws:iam::${var.prod_account_id}:root",
-            "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/GitLabRunnerRole"
+            "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/GitHubActionsRole"
           ]
         }
         Action = "sts:AssumeRole"
@@ -97,84 +97,6 @@ resource "aws_iam_role_policy" "terraform_state_access_policy" {
           "dynamodb:DeleteItem"
         ]
         Resource = aws_dynamodb_table.terraform_locks.arn
-      }
-    ]
-  })
-}
-
-# GitLab OIDC Provider
-resource "aws_iam_openid_connect_provider" "gitlab" {
-  url = var.gitlab_url
-
-  client_id_list = [
-    "https://gitlab.com", # Default audience for GitLab.com
-  ]
-
-  thumbprint_list = [
-    "9e99a48a9960b14926bb7f3b02e22da2b0ab7280" # GitLab.com thumbprint (verify if using self-hosted)
-  ]
-}
-
-# IAM Role for GitLab Runner
-resource "aws_iam_role" "gitlab_runner" {
-  name = "GitLabRunnerRole"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Principal = {
-          Federated = aws_iam_openid_connect_provider.gitlab.arn
-        }
-        Action = "sts:AssumeRoleWithWebIdentity"
-        Condition = {
-          StringLike = {
-            "${replace(var.gitlab_url, "https://", "")}:sub" : "project_path:${var.gitlab_project_path}:ref_type:branch:ref:*"
-          }
-        }
-      }
-    ]
-  })
-}
-
-# Policy to assume roles in other accounts
-resource "aws_iam_role_policy" "gitlab_runner_assume_role" {
-  name = "AssumeDeploymentRoles"
-  role = aws_iam_role.gitlab_runner.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = "sts:AssumeRole"
-        Resource = [
-          "arn:aws:iam::${var.dev_account_id}:role/DevDeployRole",
-          "arn:aws:iam::${var.prod_account_id}:role/ProdDeployRole"
-        ]
-      }
-    ]
-  })
-}
-
-# Scoped permissions for Shared Account deployments
-resource "aws_iam_role_policy" "gitlab_runner_shared" {
-  name = "SharedAccountDeployment"
-  role = aws_iam_role.gitlab_runner.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:*",
-          "dynamodb:*",
-          "iam:*",
-          "sts:*"
-        ]
-        Resource = "*"
       }
     ]
   })

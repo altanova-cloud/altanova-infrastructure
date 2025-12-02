@@ -9,7 +9,3 @@ output "dynamodb_table_arn" {
 output "cross_account_role_arn" {
   value = aws_iam_role.terraform_state_access.arn
 }
-
-output "gitlab_oidc_role_arn" {
-  value = aws_iam_role.gitlab_runner.arn
-}

@@ -14,11 +14,6 @@ variable "prod_account_id" {
   type        = string
 }
 
-variable "gitlab_project_path" {
-  description = "Path of the GitLab project (group/project) for OIDC trust"
-  type        = string
-}
-
 variable "state_bucket_name" {
   description = "Name of the S3 bucket for Terraform state"
   type        = string

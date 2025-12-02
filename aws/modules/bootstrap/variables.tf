@@ -17,14 +17,3 @@ variable "prod_account_id" {
   description = "AWS Account ID for the Production environment"
   type        = string
 }
-
-variable "gitlab_url" {
-  description = "URL of the GitLab instance (e.g., https://gitlab.com)"
-  type        = string
-  default     = "https://gitlab.com"
-}
-
-variable "gitlab_project_path" {
-  description = "Path of the GitLab project (group/project) for OIDC trust"
-  type        = string
-}

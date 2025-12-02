@@ -61,9 +61,8 @@ Each environment folder contains:
 - `terraform.auto.tfvars` - Auto-loaded defaults
 
 ### Cross-Account Access
-- **GitHub Actions:** GitHubActionsRole (Shared) → Uses OIDC for authentication
-- **GitLab (Legacy):** GitLabRunnerRole (Shared) → DevDeployRole/ProdDeployRole (App Accounts)
-- **State Access:** TerraformStateAccessRole (Shared) for cross-account state access
+- **GitHub Actions:** GitHubActionsRole (Shared) → Uses OIDC for authentication → TerraformStateAccessRole (Shared for state access)
+- **Dev/Prod Accounts:** DevDeployRole/ProdDeployRole (App Accounts) → TerraformStateAccessRole (Shared for state access)
 
 ### State Management
 - S3 bucket: `altanova-tf-state-eu-central-1`

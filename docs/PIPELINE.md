@@ -778,15 +778,21 @@ Warning: Artifact not found
 
 ## 📚 Required GitHub Repository Configuration
 
-### 1. Repository Secrets:
+### 1. Repository Variables:
 
 ```
-Settings → Secrets and variables → Actions → New repository secret
+Settings → Secrets and variables → Actions → Variables tab → New repository variable
 
 Phase 1:
 └── AWS_ROLE_ARN
     └── arn:aws:iam::265245191272:role/GitHubActionsRole
 ```
+
+**Note:** Use variables (not secrets) for role ARNs because:
+- Role ARNs are not sensitive (visible in AWS Console, CloudTrail)
+- They don't grant access without OIDC token
+- Variables are visible in logs, making debugging easier
+- This is the recommended approach per GitHub documentation
 
 ### 2. Repository Environments:
 
@@ -798,20 +804,32 @@ Environment: shared-account
 │   ├── Required reviewers: 1
 │   ├── Reviewers: @infra-team
 │   └── Deployment branches: master
-└── Environment secrets:
-    └── (Inherit from repository secrets)
+└── Environment variables:
+    └── (No environment-specific variables needed)
 
 Phase 3:
 Environment: dev-account
 ├── Protection rules: (Optional)
-└── Secrets: AWS_ROLE_ARN (Dev role)
+└── Variables: AWS_ROLE_ARN (Dev role)
 
 Environment: prod-account
 ├── Protection rules:
 │   ├── Required reviewers: 2
 │   ├── Reviewers: @infra-team-leads
 │   └── Wait timer: 5 minutes
-└── Secrets: AWS_ROLE_ARN (Prod role)
+└── Variables: AWS_ROLE_ARN (Prod role)
+```
+
+### 2. Repository Secrets:
+
+```
+Settings → Secrets and variables → Actions → Secrets tab
+
+No secrets required for Phase 1!
+
+Future phases may add:
+- INFRACOST_API_KEY (for cost estimation)
+- SLACK_WEBHOOK_URL (for notifications)
 ```
 
 ### 3. Branch Protection (Recommended):

@@ -99,7 +99,7 @@ Each environment folder contains:
 - Manual dispatch → Plan or Apply
 
 ### Required GitHub Configuration
-1. **Repository Secret:** `AWS_ROLE_ARN` = `arn:aws:iam::265245191272:role/GitHubActionsRole`
+1. **Repository Variable:** `AWS_ROLE_ARN` = `arn:aws:iam::265245191272:role/GitHubActionsRole`
 2. **Environment:** `shared-account` with protection rules and reviewers
 3. **Branch Protection:** Recommended on `master` branch
 

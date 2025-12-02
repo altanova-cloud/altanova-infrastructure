@@ -270,9 +270,10 @@ After completing this bootcamp, you will understand:
 ### Common Issues
 
 1. **OIDC Authentication Fails**
-   - Verify `gitlab_project_path` matches exactly (include group name)
-   - Check `AWS_ROLE_ARN` is set in GitLab CI/CD variables
-   - Ensure trust policy includes correct project path
+   - Verify GitHub repository name matches exactly in trust policy
+   - Check `AWS_ROLE_ARN` is set in GitHub Actions variables
+   - Ensure GitHub OIDC provider exists in AWS
+   - See `docs/PIPELINE.md` for troubleshooting
 
 2. **State Lock Errors**
    - Check DynamoDB table exists

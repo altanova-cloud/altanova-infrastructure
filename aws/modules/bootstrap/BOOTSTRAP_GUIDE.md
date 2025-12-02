@@ -1,6 +1,6 @@
 # AWS Bootstrap Guide
 
-This guide details the **one-time manual steps** required to initialize your AWS environment. You must perform this "bootstrap" process locally to create the IAM roles that GitLab CI/CD will use.
+This guide details the **one-time manual steps** required to initialize your AWS environment. You must perform this "bootstrap" process locally to create the Terraform state backend and cross-account access roles.
 
 ## Prerequisites
 1.  **Initial IAM Role**: You must have an IAM Role in the **Shared Account** with sufficient permissions (e.g., `AdministratorAccess` or `S3FullAccess`, `IAMFullAccess`, and `DynamoDBFullAccess`) to run the initial deployment.
@@ -17,12 +17,11 @@ cd landing-zones/aws/environments/shared-account
 Create a `terraform.tfvars` file with your specific values:
 ```hcl
 # terraform.tfvars
-region              = "us-east-1"
-dev_account_id      = "123456789012"  # Replace with your Dev Account ID
-prod_account_id     = "210987654321"  # Replace with your Prod Account ID
-gitlab_project_path = "my-group/my-project" # Replace with your GitLab project path
-state_bucket_name   = "my-org-terraform-state" # Unique S3 bucket name
-lock_table_name     = "terraform-locks"
+region            = "us-east-1"
+dev_account_id    = "123456789012"  # Replace with your Dev Account ID
+prod_account_id   = "210987654321"  # Replace with your Prod Account ID
+state_bucket_name = "my-org-terraform-state" # Unique S3 bucket name
+lock_table_name   = "terraform-locks"
 ```
 
 ## Step 2: Deploy Locally
@@ -71,22 +70,17 @@ If you don't have Terraform installed, you can use Docker Compose.
     ```
 *Type `yes` when prompted.*
 
-## Step 3: Configure GitLab CI/CD
+## Step 3: Verify Outputs
 After the apply completes, you will see outputs similar to this:
 ```text
-gitlab_oidc_role_arn = "arn:aws:iam::111111111111:role/GitLabRunnerRole"
-state_bucket_arn     = "arn:aws:s3:::my-org-terraform-state"
-...
+cross_account_role_arn = "arn:aws:iam::265245191272:role/TerraformStateAccessRole"
+state_bucket_arn       = "arn:aws:s3:::my-org-terraform-state"
+lock_table_arn         = "arn:aws:dynamodb:us-east-1:265245191272:table/terraform-locks"
 ```
 
-1.  Copy the `gitlab_oidc_role_arn`.
-2.  Go to your **GitLab Project Settings** > **CI/CD** > **Variables**.
-3.  Add a new variable:
-    *   **Key**: `AWS_ROLE_ARN`
-    *   **Value**: *(Paste the ARN you copied)*
-    *   **Type**: Variable
-    *   **Protected**: Yes (Recommended)
-    *   **Masked**: No (ARNs usually cannot be masked)
+These resources are now ready for use by your environments.
+
+**Note:** GitHub Actions authentication is configured separately via the `github-oidc` module in the shared-account environment. See `docs/PIPELINE.md` for GitHub Actions setup.
 
 ## Step 4: Enable Remote State (Important!)
 Now that the S3 bucket exists, you must configure Terraform to use it.
@@ -111,5 +105,14 @@ Now that the S3 bucket exists, you must configure Terraform to use it.
 
 ## Step 5: Commit and Push
 1.  Delete the local `terraform.tfstate` and `terraform.tfstate.backup` files (optional, as state is now in S3).
-2.  Commit your changes (including the new `backend.tf`) and push to GitLab.
-3.  The pipeline should now run successfully!
+2.  Commit your changes (including the new `backend.tf`) and push to GitHub.
+3.  The GitHub Actions pipeline should now work with the remote state backend!
+
+## Next Steps
+
+After completing the bootstrap process, you should:
+1. Set up GitHub OIDC authentication - see `docs/PIPELINE.md`
+2. Configure GitHub Actions workflows
+3. Deploy to dev and prod environments
+
+See the main documentation for more details.

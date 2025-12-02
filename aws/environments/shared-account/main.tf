@@ -12,6 +12,30 @@ module "bootstrap" {
   gitlab_project_path = var.gitlab_project_path
 }
 
+# GitHub OIDC module for GitHub Actions authentication
+module "github_oidc" {
+  source = "../../modules/github-oidc"
+
+  github_org        = var.github_org
+  github_repo       = var.github_repo
+  role_name         = "GitHubActionsRole"
+  oidc_provider_arn = var.github_oidc_provider_arn
+
+  state_bucket_arn      = module.bootstrap.s3_bucket_arn
+  state_bucket_name     = var.state_bucket_name
+  dynamodb_table_arn    = module.bootstrap.dynamodb_table_arn
+  dynamodb_table_name   = var.lock_table_name
+  state_access_role_arn = module.bootstrap.cross_account_role_arn
+
+  restrict_to_branch = "master"
+
+  tags = {
+    Environment = "shared"
+    ManagedBy   = "Terraform"
+    Purpose     = "GitHub Actions CI/CD"
+  }
+}
+
 output "state_bucket_arn" {
   value = module.bootstrap.s3_bucket_arn
 }
@@ -26,4 +50,14 @@ output "cross_account_role_arn" {
 
 output "gitlab_oidc_role_arn" {
   value = module.bootstrap.gitlab_oidc_role_arn
+}
+
+output "github_actions_role_arn" {
+  description = "ARN of the GitHub Actions IAM role"
+  value       = module.github_oidc.role_arn
+}
+
+output "github_actions_role_name" {
+  description = "Name of the GitHub Actions IAM role"
+  value       = module.github_oidc.role_name
 }

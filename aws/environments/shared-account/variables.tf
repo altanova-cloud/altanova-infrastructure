@@ -28,3 +28,18 @@ variable "lock_table_name" {
   description = "Name of the DynamoDB table for state locking"
   type        = string
 }
+
+variable "github_org" {
+  description = "GitHub organization name"
+  type        = string
+}
+
+variable "github_repo" {
+  description = "GitHub repository name"
+  type        = string
+}
+
+variable "github_oidc_provider_arn" {
+  description = "ARN of the GitHub OIDC provider (already created in AWS)"
+  type        = string
+}

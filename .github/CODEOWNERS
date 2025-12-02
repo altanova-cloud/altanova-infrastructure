@@ -1,0 +1,16 @@
+# CODEOWNERS for altanova-infrastructure
+# These owners will be requested for review when someone opens a pull request.
+
+# Infrastructure team owns all Terraform code
+aws/ @altanova-cloud/infra-team
+
+# Infrastructure team owns all workflow configurations
+.github/workflows/ @altanova-cloud/infra-team
+
+# Documentation owned by infrastructure team
+docs/ @altanova-cloud/infra-team
+*.md @altanova-cloud/infra-team
+
+# Root configuration files
+CLAUDE.md @altanova-cloud/infra-team
+.gitignore @altanova-cloud/infra-team

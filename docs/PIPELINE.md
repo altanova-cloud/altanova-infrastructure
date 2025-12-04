@@ -547,70 +547,262 @@ Environment: shared-account
 
 ---
 
-## 📊 Phase 2: Security & Quality Additions
+## 📊 Phase 2: Security & Quality (Implemented)
 
-### Tools to Add:
+### Overview
+
+Phase 2 adds automated security scanning to the CI/CD pipeline using a **reusable workflow** pattern. Security scans run automatically on every PR and provide detailed feedback without blocking merges (soft-fail mode for MVP).
+
+### Security Scanning Tools
 
 ```
-Security & Quality Pipeline:
+Security Pipeline (Reusable Workflow):
 ├── 1. TFLint
-│   ├── Purpose: Terraform best practices
+│   ├── Purpose: Terraform linting & best practices
 │   ├── Config: .tflint.hcl
-│   └── Fails on: errors, not warnings
+│   ├── Plugin: AWS ruleset v0.31.0
+│   ├── Output: JSON, SARIF
+│   └── Mode: Soft-fail (warnings only)
 │
 ├── 2. Checkov
-│   ├── Purpose: Security scanning
+│   ├── Purpose: Security & compliance scanning
+│   ├── Config: .checkov.yaml
 │   ├── Framework: Terraform
-│   ├── Config: .checkov.yaml (existing)
-│   └── Skip known exceptions
+│   ├── Output: JSON, SARIF
+│   └── Mode: Soft-fail (warnings only)
 │
 ├── 3. TFSec
-│   ├── Purpose: Security best practices
-│   ├── Config: .tfsec.yml (existing)
-│   └── Check AWS resources
+│   ├── Purpose: AWS security best practices
+│   ├── Config: .tfsec.yml
+│   ├── Severity: HIGH and above
+│   ├── Output: JSON, SARIF
+│   └── Mode: Soft-fail (warnings only)
 │
-├── 4. Terraform Fmt
-│   ├── Purpose: Code formatting
-│   ├── Already in Phase 1
-│   └── Enforced in validation job
-│
-└── 5. Infracost (Optional)
-    ├── Purpose: Cost estimation
-    ├── Comment cost diff on PR
-    └── Requires Infracost API key
+└── 4. Terraform Fmt
+    ├── Purpose: Code formatting
+    ├── Already in Phase 1
+    └── Enforced in validation job
 ```
 
-### Enhanced PR Comments:
+**Note:** Infracost (cost estimation) is not included in Phase 2 - planned for future phase.
 
-Phase 2 will add rich PR comments:
+### Architecture
+
+**Reusable Workflow Pattern:**
+```
+.github/workflows/
+├── terraform-shared.yml              ← Calls reusable workflow
+└── security-scan-reusable.yml        ← Reusable security scanning workflow
+```
+
+**Job Flow:**
+```
+terraform-validate
+    ↓
+security-scan (reusable workflow)
+    ↓ (soft-fail, always continues)
+terraform-plan
+    ↓
+terraform-apply
+```
+
+### Configuration Files
+
+| File | Purpose | Status |
+|------|---------|--------|
+| `.tflint.hcl` | TFLint configuration with AWS plugin | ✅ Created |
+| `.checkov.yaml` | Checkov configuration (updated) | ✅ Updated |
+| `.tfsec.yml` | TFSec configuration | ✅ Existing |
+| `.github/workflows/security-scan-reusable.yml` | Reusable security workflow | ✅ Created |
+| `.github/workflows/terraform-shared.yml` | Updated with security-scan job | ✅ Updated |
+
+### Enable/Disable Security Scanning
+
+**To disable security scanning:**
+
+**Method 1: Repository Variable (Recommended)**
+1. Go to Settings > Secrets and variables > Actions > Variables
+2. Edit `ENABLE_SECURITY_SCANNING`
+3. Set value to `false`
+4. Save (takes effect immediately on next workflow run)
+
+**Method 2: Comment Out Job (Backup)**
+1. Edit `.github/workflows/terraform-shared.yml`
+2. Comment out entire `security-scan:` job block (lines ~90-111)
+3. Commit and push
+
+**To re-enable:**
+- Set `ENABLE_SECURITY_SCANNING` back to `true`
+
+### Adding Security Exceptions
+
+**Checkov exceptions (`.checkov.yaml`):**
+```yaml
+skip-check:
+  # CKV_AWS_XXX: Short description
+  # Justification: Why this check is skipped (e.g., cost optimization, managed separately)
+  - CKV_AWS_XXX
+```
+
+**TFSec exceptions (`.tfsec.yml`):**
+```yaml
+exclude:
+  # aws-xxx-rule-name (reason for exclusion)
+  - aws-xxx-rule-name
+```
+
+**Inline exceptions (in Terraform code):**
+```hcl
+# TFSec
+# tfsec:ignore:aws-s3-enable-bucket-logging: State bucket logging disabled per ADR-001
+resource "aws_s3_bucket" "example" { }
+
+# Checkov
+#checkov:skip=CKV_AWS_18:State bucket logging disabled for cost optimization
+resource "aws_s3_bucket" "example" { }
+```
+
+### Viewing Security Results
+
+**1. PR Comments**
+Security scan results appear in the Terraform plan PR comment:
 
 ```markdown
-## Terraform Plan Summary
+#### Security Scan Results
 
-### 📊 Changes
-- ✅ Resources to create: 2
-- 🔄 Resources to update: 1
-- ❌ Resources to destroy: 0
+| Tool | Status | Findings |
+|------|--------|----------|
+| TFLint | ✅ | 0 issues |
+| Checkov | ✅ | 45 passed, 0 failed, 2 skipped |
+| TFSec | ✅ | 0 findings |
 
-### 🔐 Security Scan Results
-- Checkov: ✅ Passed (2 exceptions skipped)
-- TFSec: ✅ No issues found
-- TFLint: ✅ No errors
-
-### 💰 Cost Impact (Infracost)
-- Monthly cost change: +$15.00 USD
-- New resources: $15.00 USD
-
-### 📋 Plan Details
-<details>
-<summary>View Full Plan</summary>
-
+> **Mode:** Soft-fail (warnings only) | View detailed reports in Security tab
 ```
-[Full terraform plan output]
+
+**2. GitHub Security Tab**
+- Navigate to repository > Security > Code scanning
+- View detailed SARIF findings from all three tools
+- Filter by tool (tflint-shared, checkov-shared, tfsec-shared)
+
+**3. Workflow Artifacts**
+- Navigate to Actions > Workflow run > Artifacts
+- Download `security-scan-shared-<sha>` artifact
+- Contains full JSON and SARIF reports
+- Retention: 90 days (SOC 2 compliance)
+
+### Enhanced PR Comments
+
+Phase 2 adds security results to PR comments:
+
+```markdown
+### Terraform Plan Results 📋
+
+**Environment:** Shared Account
+**Workflow:** `Terraform - Shared Account`
+**Run:** [#123](link)
+
+#### Security Scan Results
+
+| Tool | Status | Findings |
+|------|--------|----------|
+| TFLint | ✅ | 0 issues |
+| Checkov | ⚠️ | 42 passed, 3 failed, 2 skipped |
+| TFSec | ✅ | 0 findings |
+
+> **Mode:** Soft-fail (warnings only) | [View detailed reports in Security tab](link)
+
+#### Terraform Plan Output
+
+<details>
+<summary>View Plan</summary>
+
+```terraform
+[terraform plan output]
 ```
 
 </details>
+
+**Next Steps:**
+- Review the plan carefully
+- Review security findings (if any)
+- If approved, merge this PR to trigger apply
 ```
+
+### SOC 2 Compliance Features
+
+| Feature | Implementation |
+|---------|---------------|
+| Audit trail | 90-day artifact retention (configurable to 400 days) |
+| Evidence collection | JSON + SARIF reports archived per workflow run |
+| Immutable logs | GitHub Actions audit logs |
+| Traceability | Commit SHA in artifact names (`security-scan-shared-<sha>`) |
+| Exception tracking | Documented in `.checkov.yaml` and `.tfsec.yml` with justifications |
+| Security findings | SARIF upload to GitHub Security tab for centralized visibility |
+
+### Transitioning to Hard-Fail Mode
+
+When ready to enforce security checks (block PRs on findings):
+
+**1. Update workflow configuration:**
+
+Edit `.github/workflows/terraform-shared.yml`:
+```yaml
+security-scan:
+  uses: ./.github/workflows/security-scan-reusable.yml
+  with:
+    fail_on_findings: true  # Change from false to true
+```
+
+**2. Update Checkov configuration:**
+
+Edit `.checkov.yaml`:
+```yaml
+soft-fail: false  # Change from true to false
+```
+
+**3. Add to branch protection (Optional):**
+- Settings > Branches > master > Branch protection rules
+- Enable "Require status checks to pass before merging"
+- Add "Security Scan" as required check
+
+**4. Consider adjusting severity thresholds:**
+
+Edit `.tfsec.yml`:
+```yaml
+minimum_severity: MEDIUM  # Lower from HIGH if stricter compliance needed
+```
+
+### Per-Environment Gating (Phase 3)
+
+In Phase 3, different environments can have different security policies:
+
+```yaml
+# Dev: Soft-fail (warnings only)
+fail_on_findings: false
+
+# Prod: Hard-fail (block on HIGH/CRITICAL)
+fail_on_findings: true
+```
+
+### Troubleshooting
+
+**Security scan job skipped:**
+- Check repository variable `ENABLE_SECURITY_SCANNING` is set to `true`
+- If variable doesn't exist, create it in Settings > Secrets and variables > Actions > Variables
+
+**SARIF upload fails:**
+- Verify `security-events: write` permission in workflow
+- Check GitHub Code Scanning is enabled (Settings > Security > Code scanning)
+
+**TFLint plugin download fails:**
+- TFLint will auto-download AWS plugin on first run
+- Check internet connectivity from GitHub Actions runner
+- Plugin cached in `~/.tflint.d/plugins`
+
+**Checkov/TFSec timeout:**
+- Default timeout: 15 minutes
+- Large Terraform codebases may need adjustment
+- Edit timeout in `security-scan-reusable.yml`
 
 ---
 

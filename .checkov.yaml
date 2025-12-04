@@ -15,11 +15,15 @@ skip-check:
 framework:
   - terraform
 
-# Output formats
+# Output formats (Phase 2: Added SARIF for GitHub Security tab)
 output:
   - cli
   - json
-  - gitlab_sast
+  - sarif
+
+# Compact output for CI
+compact: true
 
 # Soft fail mode (don't fail pipeline on findings)
+# Set to false when transitioning from MVP to production
 soft-fail: true

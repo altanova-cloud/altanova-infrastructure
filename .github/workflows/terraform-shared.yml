@@ -87,11 +87,36 @@ jobs:
           echo "- **Init:** ${{ steps.init.outcome == 'success' && '✅ Passed' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Validate:** ${{ steps.validate.outcome == 'success' && '✅ Passed' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
 
-  # Job 2: Plan Terraform changes
+  # ============================================================
+  # Job 2: Security Scan (Phase 2)
+  #
+  # HOW TO DISABLE:
+  # Option 1: Set repository variable ENABLE_SECURITY_SCANNING = 'false'
+  # Option 2: Comment out this entire job block
+  # ============================================================
+  security-scan:
+    name: Security Scan
+    needs: terraform-validate
+    # Easy disable: Set ENABLE_SECURITY_SCANNING to 'false' in repo variables
+    if: vars.ENABLE_SECURITY_SCANNING != 'false'
+    uses: ./.github/workflows/security-scan-reusable.yml
+    with:
+      working_directory: aws/environments/shared-account
+      terraform_version: '1.8'
+      environment_name: shared
+      artifact_retention_days: 90  # SOC 2 compliance
+      fail_on_findings: false  # Soft fail for MVP
+    permissions:
+      contents: read
+      security-events: write  # Required for SARIF upload
+
+  # Job 3: Plan Terraform changes
   terraform-plan:
     name: Plan
     runs-on: ubuntu-latest
-    needs: terraform-validate
+    needs: [terraform-validate, security-scan]
+    # Allow plan to run even if security-scan is skipped
+    if: always() && needs.terraform-validate.result == 'success'
     timeout-minutes: 20
     environment:
       name: shared-account
@@ -142,11 +167,46 @@ jobs:
             const fs = require('fs');
             const planOutput = fs.readFileSync('${{ env.WORKING_DIR }}/plan_output.txt', 'utf8');
 
-            // Truncate plan if too long (GitHub comment limit is 65536)
-            const maxLength = 60000;
+            // Truncate plan if too long (reduced to accommodate security section)
+            const maxLength = 55000;
             let truncatedPlan = planOutput;
             if (planOutput.length > maxLength) {
               truncatedPlan = planOutput.substring(0, maxLength) + '\n\n... (truncated)';
+            }
+
+            // Security scan results (if available)
+            const securityScanRan = '${{ needs.security-scan.result }}' !== 'skipped';
+            let securitySection = '';
+
+            if (securityScanRan) {
+              const tflintStatus = '${{ needs.security-scan.outputs.tflint_status }}';
+              const checkovStatus = '${{ needs.security-scan.outputs.checkov_status }}';
+              const tfsecStatus = '${{ needs.security-scan.outputs.tfsec_status }}';
+              const tflintFindings = '${{ needs.security-scan.outputs.tflint_findings }}' || '0';
+              const checkovPassed = '${{ needs.security-scan.outputs.checkov_passed }}' || '0';
+              const checkovFailed = '${{ needs.security-scan.outputs.checkov_failed }}' || '0';
+              const checkovSkipped = '${{ needs.security-scan.outputs.checkov_skipped }}' || '0';
+              const tfsecFindings = '${{ needs.security-scan.outputs.tfsec_findings }}' || '0';
+
+              const getIcon = (status) => status === 'success' ? '✅' : '⚠️';
+
+              securitySection = `
+            #### Security Scan Results
+
+            | Tool | Status | Findings |
+            |------|--------|----------|
+            | TFLint | ${getIcon(tflintStatus)} | ${tflintFindings} issues |
+            | Checkov | ${getIcon(checkovStatus)} | ${checkovPassed} passed, ${checkovFailed} failed, ${checkovSkipped} skipped |
+            | TFSec | ${getIcon(tfsecStatus)} | ${tfsecFindings} findings |
+
+            > **Mode:** Soft-fail (warnings only) | [View detailed reports in Security tab](${{ github.server_url }}/${{ github.repository }}/security/code-scanning)
+            `;
+            } else {
+              securitySection = `
+            #### Security Scan
+
+            > ℹ️ Security scanning is disabled. Set \`ENABLE_SECURITY_SCANNING=true\` to enable.
+            `;
             }
 
             const output = `### Terraform Plan Results 📋
@@ -154,7 +214,7 @@ jobs:
             **Environment:** Shared Account
             **Workflow:** \`${{ github.workflow }}\`
             **Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-
+            ${securitySection}
             #### Terraform Plan Output
 
             <details>
@@ -168,6 +228,7 @@ jobs:
 
             **Next Steps:**
             - Review the plan carefully
+            - Review security findings (if any)
             - If approved, merge this PR to trigger apply
             - Manual approval will be required before apply executes
             `;

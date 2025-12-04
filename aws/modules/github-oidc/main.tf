@@ -51,7 +51,7 @@ data "aws_iam_policy_document" "github_actions_assume_role" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:aud"
-      values   = ["sts.amazonaws.com"]
+      values   = ["sts.amazonaws.com", "sigv4.amazonaws.com"]
     }
 
     condition {

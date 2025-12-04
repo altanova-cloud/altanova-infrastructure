@@ -78,8 +78,12 @@ resource "aws_iam_policy" "terraform_state_access" {
 }
 
 # Policy document for Terraform state access
+# These permissions allow GitHub Actions to read and write Terraform state,
+# and manage state locking. The comprehensive read permissions ensure Terraform
+# can refresh state without permission errors during plan/apply operations.
 data "aws_iam_policy_document" "terraform_state_access" {
   # S3 bucket access for state files
+  # Includes all read permissions Terraform needs to inspect bucket configuration
   statement {
     sid    = "TerraformStateS3Access"
     effect = "Allow"

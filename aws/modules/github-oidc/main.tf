@@ -108,6 +108,7 @@ data "aws_iam_policy_document" "terraform_state_access" {
     effect = "Allow"
     actions = [
       "dynamodb:DescribeTable",
+      "dynamodb:DescribeContinuousBackups",
       "dynamodb:GetItem",
       "dynamodb:PutItem",
       "dynamodb:DeleteItem"

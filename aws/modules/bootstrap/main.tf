@@ -50,7 +50,6 @@ resource "aws_dynamodb_table" "terraform_locks" {
 # Cross-Account IAM Role for Terraform State Access
 resource "aws_iam_role" "terraform_state_access" {
   name = "TerraformStateAccessRole"
-
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -59,8 +58,7 @@ resource "aws_iam_role" "terraform_state_access" {
         Principal = {
           AWS = [
             "arn:aws:iam::${var.dev_account_id}:root",
-            "arn:aws:iam::${var.prod_account_id}:root",
-            "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/GitHubActionsRole"
+            "arn:aws:iam::${var.prod_account_id}:root"
           ]
         }
         Action = "sts:AssumeRole"

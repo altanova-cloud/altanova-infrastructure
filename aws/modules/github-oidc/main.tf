@@ -86,7 +86,20 @@ data "aws_iam_policy_document" "terraform_state_access" {
     actions = [
       "s3:ListBucket",
       "s3:GetBucketVersioning",
-      "s3:GetBucketLocation"
+      "s3:GetBucketLocation",
+      "s3:GetBucketPolicy",
+      "s3:GetBucketTagging",
+      "s3:GetBucketPublicAccessBlock",
+      "s3:GetBucketAcl",
+      "s3:GetBucketCORS",
+      "s3:GetBucketWebsite",
+      "s3:GetBucketLogging",
+      "s3:GetBucketRequestPayment",
+      "s3:GetBucketObjectLockConfiguration",
+      "s3:GetEncryptionConfiguration",
+      "s3:GetLifecycleConfiguration",
+      "s3:GetReplicationConfiguration",
+      "s3:GetAccelerateConfiguration"
     ]
     resources = [var.state_bucket_arn]
   }
@@ -96,8 +109,13 @@ data "aws_iam_policy_document" "terraform_state_access" {
     effect = "Allow"
     actions = [
       "s3:GetObject",
+      "s3:GetObjectVersion",
+      "s3:GetObjectTagging",
+      "s3:GetObjectVersionTagging",
       "s3:PutObject",
-      "s3:DeleteObject"
+      "s3:PutObjectTagging",
+      "s3:DeleteObject",
+      "s3:DeleteObjectVersion"
     ]
     resources = ["${var.state_bucket_arn}/*"]
   }

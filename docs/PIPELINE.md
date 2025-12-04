@@ -353,7 +353,7 @@ Trigger Conditions:
 │                                                                │
 │ 2. Configure AWS Credentials (OIDC)                            │
 │    - uses: aws-actions/configure-aws-credentials@v4            │
-│    - role-to-assume: ${{ secrets.AWS_ROLE_ARN }}              │
+│    - role-to-assume: ${{ vars.AWS_ROLE_ARN }}                 │
 │    - aws-region: us-east-1                                     │
 │    - session duration: 3600 seconds                            │
 │                                                                │
@@ -413,7 +413,7 @@ Trigger Conditions:
 │                                                                │
 │ 3. Configure AWS Credentials (OIDC)                            │
 │    - uses: aws-actions/configure-aws-credentials@v4            │
-│    - role-to-assume: ${{ secrets.AWS_ROLE_ARN }}              │
+│    - role-to-assume: ${{ vars.AWS_ROLE_ARN }}                 │
 │                                                                │
 │ 4. Setup Terraform                                             │
 │    - uses: hashicorp/setup-terraform@v3                        │

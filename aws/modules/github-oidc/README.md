@@ -121,7 +121,7 @@ To use this role in GitHub Actions:
 - name: Configure AWS Credentials
   uses: aws-actions/configure-aws-credentials@v4
   with:
-    role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+    role-to-assume: ${{ vars.AWS_ROLE_ARN }}
     aws-region: us-east-1
     role-session-name: GitHubActions-${{ github.run_id }}
 ```

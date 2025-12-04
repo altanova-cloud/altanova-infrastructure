@@ -26,7 +26,7 @@ module "github_oidc" {
   dynamodb_table_name   = var.lock_table_name
   state_access_role_arn = module.bootstrap.cross_account_role_arn
 
-  restrict_to_branch = "master"
+  restrict_to_branch = ""
 
   tags = {
     Environment = "shared"

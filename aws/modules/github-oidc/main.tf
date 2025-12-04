@@ -51,7 +51,7 @@ data "aws_iam_policy_document" "github_actions_assume_role" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:aud"
-      values   = ["sts.amazonaws.com"]
+      values   = ["sts.amazonaws.com", "sigv4.amazonaws.com"]
     }
 
     condition {
@@ -78,15 +78,32 @@ resource "aws_iam_policy" "terraform_state_access" {
 }
 
 # Policy document for Terraform state access
+# These permissions allow GitHub Actions to read and write Terraform state,
+# and manage state locking. The comprehensive read permissions ensure Terraform
+# can refresh state without permission errors during plan/apply operations.
 data "aws_iam_policy_document" "terraform_state_access" {
   # S3 bucket access for state files
+  # Includes all read permissions Terraform needs to inspect bucket configuration
   statement {
     sid    = "TerraformStateS3Access"
     effect = "Allow"
     actions = [
       "s3:ListBucket",
       "s3:GetBucketVersioning",
-      "s3:GetBucketLocation"
+      "s3:GetBucketLocation",
+      "s3:GetBucketPolicy",
+      "s3:GetBucketTagging",
+      "s3:GetBucketPublicAccessBlock",
+      "s3:GetBucketAcl",
+      "s3:GetBucketCORS",
+      "s3:GetBucketWebsite",
+      "s3:GetBucketLogging",
+      "s3:GetBucketRequestPayment",
+      "s3:GetBucketObjectLockConfiguration",
+      "s3:GetEncryptionConfiguration",
+      "s3:GetLifecycleConfiguration",
+      "s3:GetReplicationConfiguration",
+      "s3:GetAccelerateConfiguration"
     ]
     resources = [var.state_bucket_arn]
   }
@@ -96,8 +113,13 @@ data "aws_iam_policy_document" "terraform_state_access" {
     effect = "Allow"
     actions = [
       "s3:GetObject",
+      "s3:GetObjectVersion",
+      "s3:GetObjectTagging",
+      "s3:GetObjectVersionTagging",
       "s3:PutObject",
-      "s3:DeleteObject"
+      "s3:PutObjectTagging",
+      "s3:DeleteObject",
+      "s3:DeleteObjectVersion"
     ]
     resources = ["${var.state_bucket_arn}/*"]
   }
@@ -109,6 +131,8 @@ data "aws_iam_policy_document" "terraform_state_access" {
     actions = [
       "dynamodb:DescribeTable",
       "dynamodb:DescribeContinuousBackups",
+      "dynamodb:DescribeTimeToLive",
+      "dynamodb:ListTagsOfResource",
       "dynamodb:GetItem",
       "dynamodb:PutItem",
       "dynamodb:DeleteItem"

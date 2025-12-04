@@ -110,6 +110,7 @@ data "aws_iam_policy_document" "terraform_state_access" {
       "dynamodb:DescribeTable",
       "dynamodb:DescribeContinuousBackups",
       "dynamodb:DescribeTimeToLive",
+      "dynamodb:ListTagsOfResource",
       "dynamodb:GetItem",
       "dynamodb:PutItem",
       "dynamodb:DeleteItem"

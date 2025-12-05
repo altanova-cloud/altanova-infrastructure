@@ -54,27 +54,28 @@ This document provides comprehensive documentation for the GitHub Actions CI/CD 
 ## 📐 Phased Implementation Strategy
 
 ```
-Phase 1: Foundation (Week 1)
+Phase 1: Foundation ✅ COMPLETE
 ├── GitHub OIDC Setup
 ├── Basic Terraform Workflow (Shared Account)
 ├── Manual Approval Gates
 └── Documentation
 
-Phase 2: Security & Quality (Week 2)
+Phase 2: Security & Quality (Future)
 ├── TFLint Integration
 ├── Checkov Security Scanning
 ├── TFSec Analysis
 ├── Enhanced PR Comments
 └── Cost Estimation (Optional)
 
-Phase 3: Multi-Environment (Week 3-4)
-├── Dev Account Workflow
-├── Prod Account Workflow
-├── Protected Environments
-├── Environment-Specific Approvals
-└── Drift Detection
+Phase 3: Multi-Environment ✅ COMPLETE
+├── Dev Account Workflow (terraform-dev.yml)
+├── Prod Account Workflow (terraform-prod.yml)
+├── Protected Environments (prod-account)
+├── Environment-Specific Approvals (auto for dev, manual for prod)
+└── GitHub Flow + Semantic Branch Naming
 
-Phase 4: Advanced Features (Week 5+)
+Phase 4: Advanced Features (Future)
+├── Drift Detection (Scheduled)
 ├── Automated PR Labeling
 ├── Notifications (Slack/Teams)
 ├── Terraform Docs Generation
@@ -224,15 +225,17 @@ Phase 4: Advanced Features (Week 5+)
 
 ---
 
-## 📁 Repository Structure (Phase 1)
+## 📁 Repository Structure
 
 ```
 altanova-infrastructure/
 ├── .github/
 │   ├── workflows/
-│   │   └── terraform-shared.yml          ← NEW: Phase 1 workflow
+│   │   ├── terraform-shared.yml          ← Phase 1: Shared Account
+│   │   ├── terraform-dev.yml             ← Phase 3: Dev Account (auto-apply)
+│   │   └── terraform-prod.yml            ← Phase 3: Prod Account (manual approval)
 │   │
-│   └── CODEOWNERS                         ← NEW: Infra team ownership
+│   └── CODEOWNERS                         ← Infra team ownership
 │       # aws/environments/shared-account/ @altanova-cloud/infra-team
 │
 ├── aws/
@@ -614,38 +617,74 @@ Phase 2 will add rich PR comments:
 
 ---
 
-## 🌍 Phase 3: Multi-Environment Support
+## 🌍 Phase 3: Multi-Environment Support ✅ IMPLEMENTED
 
 ### Workflow Structure:
 
 ```
 .github/workflows/
-├── terraform-shared.yml      ← Phase 1 (Shared Account)
-├── terraform-dev.yml         ← Phase 3 (Dev Account)
-└── terraform-prod.yml        ← Phase 3 (Prod Account)
+├── terraform-shared.yml      ← Phase 1 (Shared Account) ✅
+├── terraform-dev.yml         ← Phase 3 (Dev Account) ✅ IMPLEMENTED
+└── terraform-prod.yml        ← Phase 3 (Prod Account) ✅ IMPLEMENTED
+```
 
-OR (Alternative: Single workflow with matrix)
+**Decision:** Separate workflow files (not matrix) for:
+- Clear separation per account
+- Independent triggers and paths
+- Easy to understand and maintain
+- Avoids OIDC/reusable workflow complexities
 
-.github/workflows/
-└── terraform.yml             ← Matrix strategy for all accounts
+### Git Workflow: GitHub Flow
+
+Based on startup best practices, we use **GitHub Flow** (simplified trunk-based):
+- One main branch (`master`) + short-lived feature branches
+- PR-based review ensures safety before infrastructure changes
+- Simple and appropriate for small DevOps teams
+
+### Branch Naming Convention
+
+Semantic branch naming for clarity and automation:
+
+```
+<type>/<short-description>
+
+Types:
+├── feature/ or feat/  → New features
+├── fix/ or bugfix/    → Bug fixes
+├── hotfix/            → Critical production fixes
+├── docs/              → Documentation changes
+├── refactor/          → Code refactoring
+└── chore/             → Maintenance tasks
+
+Examples:
+  feature/vpc-infrastructure
+  feat/eks-blueprints
+  fix/nat-gateway-config
+  docs/pipeline-update
+  chore/terraform-upgrade
 ```
 
 ### Environment-Specific Configuration:
 
 ```yaml
-Dev Account Workflow:
+Dev Account Workflow (terraform-dev.yml):
 ├── Trigger: aws/environments/dev-app-account/** changes
-├── Environment: dev-account
-├── Approval: Optional (auto-approve or single reviewer)
-├── Role: arn:aws:iam::975050047325:role/GitHubActionsDevRole
-└── Backend: dev-app-account/infrastructure/terraform.tfstate
+├── Trigger: aws/modules/vpc/** changes (env-specific)
+├── Trigger: aws/modules/deployment-role/** changes
+├── Environment: None (auto-apply after merge)
+├── Approval: NOT REQUIRED (fast iteration for dev)
+├── Role Chain: GitHubActionsRole → DevDeployRole
+├── Dev Role: arn:aws:iam::975050047325:role/DevDeployRole
+└── Backend: dev-app-account/terraform.tfstate
 
-Prod Account Workflow:
+Prod Account Workflow (terraform-prod.yml):
 ├── Trigger: aws/environments/prod-app-account/** changes
+├── Trigger: aws/modules/vpc/** changes (env-specific)
+├── Trigger: aws/modules/deployment-role/** changes
 ├── Environment: prod-account (PROTECTED)
-├── Approval: REQUIRED (2 reviewers from infra team)
-├── Role: arn:aws:iam::624755517249:role/GitHubActionsProdRole
-├── External ID: production-deployment
+├── Approval: REQUIRED (manual approval before apply)
+├── Role Chain: GitHubActionsRole → ProdDeployRole
+├── Prod Role: arn:aws:iam::624755517249:role/ProdDeployRole
 └── Backend: prod-app-account/terraform.tfstate
 ```
 
@@ -653,16 +692,109 @@ Prod Account Workflow:
 
 ```
 GitHub OIDC Token
-    ↓
+         │
+         ▼
 GitHubActionsRole (Shared: 265245191272)
-    ↓
-    ├→ AssumeRole → GitHubActionsDevRole (Dev: 975050047325)
-    │                    ↓
-    │              Deploy Dev Infrastructure
-    │
-    └→ AssumeRole → GitHubActionsProdRole (Prod: 624755517249)
-                         ↓
-                   Deploy Prod Infrastructure (with approval)
+         │
+         ├──► Direct deploy to Shared Account
+         │
+         ├──► AssumeRole (role-chaining) ──► DevDeployRole (Dev: 975050047325)
+         │                                         │
+         │                                         ▼
+         │                                    Deploy Dev Infrastructure
+         │                                    (Auto-apply after merge)
+         │
+         └──► AssumeRole (role-chaining) ──► ProdDeployRole (Prod: 624755517249)
+                                                   │
+                                                   ▼
+                                              Deploy Prod Infrastructure
+                                              (Manual approval required)
+```
+
+### Dev vs Prod Workflow Comparison:
+
+| Feature | Dev Account | Prod Account |
+|---------|-------------|--------------|
+| **Workflow File** | terraform-dev.yml | terraform-prod.yml |
+| **Path Triggers** | dev-app-account/**, modules/vpc/**, modules/deployment-role/** | prod-app-account/**, modules/vpc/**, modules/deployment-role/** |
+| **PR to master** | Validate + Plan | Validate + Plan |
+| **Push to master** | Auto-Apply | Requires Manual Approval |
+| **Environment Protection** | None | `prod-account` with reviewers |
+| **Role Chain** | GitHubActionsRole → DevDeployRole | GitHubActionsRole → ProdDeployRole |
+| **Concurrency Group** | terraform-dev-${{ github.ref }} | terraform-prod-${{ github.ref }} |
+
+### GitHub Configuration Required (Phase 3):
+
+```
+Repository Variables (Settings → Secrets and variables → Actions → Variables):
+└── AWS_ROLE_ARN = arn:aws:iam::265245191272:role/GitHubActionsRole (existing)
+
+Environments (Settings → Environments):
+├── shared-account      ← Phase 1 (existing)
+│   └── Protection rules: Required reviewers
+│
+└── prod-account        ← Phase 3 (NEW)
+    ├── Protection rules:
+    │   ├── Required reviewers: 1-2 from DevOps team
+    │   └── Deployment branches: master only
+    └── No environment-specific variables (uses repo-level AWS_ROLE_ARN)
+
+Note: dev-account environment NOT required (auto-apply without approval)
+```
+
+### Workflow Flow Diagrams:
+
+#### Dev Account Flow (Auto-Apply):
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│ Developer creates PR with dev-app-account changes              │
+└────────────────────────────────────────────────────────────────┘
+                          ↓
+┌────────────────────────────────────────────────────────────────┐
+│ terraform-dev.yml triggers                                     │
+│ Jobs: terraform-validate → terraform-plan                      │
+│ Plan output commented on PR                                    │
+└────────────────────────────────────────────────────────────────┘
+                          ↓
+┌────────────────────────────────────────────────────────────────┐
+│ PR reviewed and merged to master                               │
+└────────────────────────────────────────────────────────────────┘
+                          ↓
+┌────────────────────────────────────────────────────────────────┐
+│ terraform-apply job runs automatically                         │
+│ No manual approval required                                    │
+│ Infrastructure deployed to Dev Account                         │
+└────────────────────────────────────────────────────────────────┘
+```
+
+#### Prod Account Flow (Manual Approval):
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│ Developer creates PR with prod-app-account changes             │
+└────────────────────────────────────────────────────────────────┘
+                          ↓
+┌────────────────────────────────────────────────────────────────┐
+│ terraform-prod.yml triggers                                    │
+│ Jobs: terraform-validate → terraform-plan                      │
+│ Plan output commented on PR (marked as PRODUCTION)             │
+└────────────────────────────────────────────────────────────────┘
+                          ↓
+┌────────────────────────────────────────────────────────────────┐
+│ PR reviewed and merged to master                               │
+└────────────────────────────────────────────────────────────────┘
+                          ↓
+┌────────────────────────────────────────────────────────────────┐
+│ terraform-apply job PAUSES for manual approval                 │
+│ ⚠️ Requires reviewer to approve in GitHub Actions              │
+│ Navigate to Actions → Running workflow → Review deployments    │
+└────────────────────────────────────────────────────────────────┘
+                          ↓
+┌────────────────────────────────────────────────────────────────┐
+│ After approval: terraform apply executes                       │
+│ Infrastructure deployed to Prod Account                        │
+└────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -1084,9 +1216,9 @@ git push origin feature/add-ecr-repository
 4. Update CLAUDE.md if AI assistant guidance needed
 
 **Document Owner:** Infrastructure Team
-**Last Updated:** 2025-12-02
-**Version:** 1.0.0 (Phase 1 Planning)
-**Next Review:** After Phase 1 implementation
+**Last Updated:** 2025-12-05
+**Version:** 1.1.0 (Phase 3 Multi-Environment Implementation)
+**Next Review:** After Phase 4 implementation
 
 ---
 

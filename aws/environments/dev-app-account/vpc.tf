@@ -17,6 +17,10 @@ module "vpc" {
   # Note: Module uses single NAT gateway by default for cost optimization
   enable_flow_logs = true
 
+  # Database subnets disabled for now (no RDS/ElastiCache planned)
+  # Set to true when needed
+  enable_database_subnets = false
+
   tags = {
     Environment = "dev"
     ManagedBy   = "Terraform"

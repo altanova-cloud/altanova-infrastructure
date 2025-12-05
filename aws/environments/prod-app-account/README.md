@@ -1,292 +1,195 @@
-# Production Environment - AltaNova EKS Cluster
+# Prod App Account Infrastructure
 
-This directory contains the production infrastructure configuration for the AltaNova platform.
+This directory contains the production VPC infrastructure configuration for the AltaNova platform.
 
 ## 🏗️ Architecture
 
 ```
-Production Account (10.1.0.0/16)
-├── VPC (3 Availability Zones for HA)
-│   ├── Public Subnets (10.1.1-3.0/24)
-│   ├── Private Subnets (10.1.10-12.0/24) - EKS nodes
-│   └── Database Subnets (10.1.20-22.0/24) - RDS, ElastiCache
+Production Account (624755517249)
+├── VPC: 10.1.0.0/16 (eu-west-1)
+│   ├── Public Subnets (3 AZs)
+│   │   ├── eu-west-1a: 10.1.1.0/24 (ALB, NAT Gateway)
+│   │   ├── eu-west-1b: 10.1.2.0/24 (ALB, NAT Gateway)
+│   │   └── eu-west-1c: 10.1.3.0/24 (ALB, NAT Gateway)
+│   │
+│   ├── Private Subnets (3 AZs)
+│   │   ├── eu-west-1a: 10.1.10.0/24 (EKS Nodes, Pods)
+│   │   ├── eu-west-1b: 10.1.11.0/24 (EKS Nodes, Pods)
+│   │   └── eu-west-1c: 10.1.12.0/24 (EKS Nodes, Pods)
+│   │
+│   ├── Database Subnets (3 AZs)
+│   │   ├── eu-west-1a: 10.1.20.0/24 (RDS, ElastiCache)
+│   │   ├── eu-west-1b: 10.1.21.0/24 (RDS, ElastiCache)
+│   │   └── eu-west-1c: 10.1.22.0/24 (RDS, ElastiCache)
+│   │
+│   ├── NAT Gateways: 3 (one per AZ for HA)
+│   ├── Internet Gateway: Implicit
+│   └── VPC Flow Logs: Enabled to CloudWatch
 │
-└── EKS Cluster: altanova-prod
-    ├── Version: 1.32
-    ├── Karpenter: Enabled (intelligent autoscaling)
-    ├── Node Groups: SPOT instances (t3.medium)
-    ├── Min/Max Nodes: 3-10
-    └── Add-ons:
-        ├── AWS Load Balancer Controller
-        ├── Metrics Server
-        ├── Karpenter (autoscaling)
-        ├── Gateway API
-        ├── Fluent Bit (logging)
-        └── Prometheus Stack (monitoring)
+└── Deployment Role: ProdDeployRole (for CI/CD)
 ```
 
 ## 🚀 Deployment
 
 ### Prerequisites
-1. Shared account infrastructure deployed (OIDC, Terraform state)
-2. Production deployment IAM role configured
-3. Backend configuration file (`backend.conf`)
+1. AWS credentials configured for prod account (624755517249)
+2. Access to shared account state backend
+3. Terraform >= 1.8
+4. Approval from infrastructure team (2 reviewers required)
 
 ### Deploy Infrastructure
 
 ```bash
 # Navigate to prod environment
-cd /Users/marwanghubein/tech-repo/landing-zones/aws/environments/prod-app-account
+cd aws/environments/prod-app-account
 
 # Initialize Terraform
 terraform init -backend-config=backend.conf
 
-# Review plan
-terraform plan
+# Validate configuration
+terraform validate
 
-# Apply (requires approval)
-terraform apply
+# Review plan (careful - this is production!)
+terraform plan -out=tfplan.prod
+
+# Show plan details
+terraform show tfplan.prod
 ```
 
-### Configure kubectl
+### Review and Apply (With Approval)
+
+**IMPORTANT:** Production deployments require 2-person approval
 
 ```bash
-aws eks update-kubeconfig --region eu-west-1 --name altanova-prod
+# After approval from team, apply infrastructure
+terraform apply tfplan.prod
 ```
 
-### Deploy Karpenter NodePools
+## ✅ What's Deployed
 
-After cluster creation:
-
-```bash
-# Verify Karpenter is running
-kubectl get pods -n karpenter
-
-# Apply NodePool configurations
-kubectl apply -f karpenter-nodepool.yaml
-
-# Verify NodePools
-kubectl get nodepools -n karpenter
-kubectl get ec2nodeclasses -n karpenter
-```
+- ✅ VPC (10.1.0.0/16)
+- ✅ Public Subnets (3 AZs)
+- ✅ Private Subnets (3 AZs)
+- ✅ Database Subnets (3 AZs)
+- ✅ NAT Gateways (3 - one per AZ for HA)
+- ✅ VPC Flow Logs (CloudWatch)
 
 ## 🎯 Production Features
 
 ### High Availability
 - ✅ **3 Availability Zones** for fault tolerance
+- ✅ **NAT per AZ** - no single point of failure
 - ✅ **Multi-AZ subnets** for all tiers
-- ✅ **Karpenter** distributes nodes across AZs
-- ✅ **Pod Disruption Budgets** recommended for critical apps
+- ✅ **Subnet redundancy** across all 3 AZs
 
-### Cost Optimization
-- ✅ **Karpenter** for intelligent autoscaling (60% savings)
-- ✅ **SPOT instances** for non-critical workloads (70% cheaper)
-- ✅ **On-demand pool** for critical workloads
-- ✅ **Automatic consolidation** reduces waste
-- ✅ **Single NAT gateway** (can enable more if needed)
+### Network Design
+- ✅ **3-tier architecture**: Public, Private, Database
+- ✅ **Isolated subnets** for security
+- ✅ **VPC Flow Logs** for compliance and monitoring
+- ✅ **Private database** tier with RDS/ElastiCache support
 
 ### Security
 - ✅ **Private subnets** for EKS nodes
-- ✅ **IMDSv2 required** on all nodes
-- ✅ **Encrypted EBS volumes**
 - ✅ **VPC Flow Logs** enabled (30-day retention)
-- ✅ **Full CloudWatch logging** for audit trail
+- ✅ **CloudWatch logging** for audit trail
+- ✅ **Cross-account** role assumption for state access
 
-### Monitoring & Observability
-- ✅ **Prometheus Stack** for metrics
-- ✅ **Fluent Bit** for centralized logging
-- ✅ **CloudWatch integration**
-- ✅ **Metrics Server** for HPA
+## 💰 Cost Considerations
 
-## 📊 Karpenter Configuration
+### VPC Infrastructure Costs
 
-### Two NodePools:
+| Component | Quantity | Monthly Cost |
+|-----------|----------|--------------|
+| NAT Gateway | 3 (one per AZ) | ~$96 |
+| VPC Flow Logs | Data transfer | ~$5 |
+| **Total VPC Cost** | | **~$100/month** |
 
-#### 1. **general-purpose** (Default)
-- **Capacity**: SPOT with on-demand fallback
-- **Instance Types**: t3.medium, t3a.medium
-- **Limits**: 200 vCPUs, 400GB memory
-- **Consolidation**: After 60s of underutilization
-- **Use Case**: Most workloads
+**Note:** Costs for EKS cluster, RDS, and application workloads will be added in subsequent phases.
 
-#### 2. **critical-workloads**
-- **Capacity**: On-demand ONLY
-- **Instance Types**: t3.medium, t3a.medium
-- **Limits**: 50 vCPUs, 100GB memory
-- **Taint**: `workload=critical:NoSchedule`
-- **Use Case**: Databases, stateful apps, critical services
+## Accessing Outputs
 
-### Using Critical NodePool
+After deployment:
 
-To schedule pods on critical (on-demand) nodes:
-
-```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: critical-app
-spec:
-  tolerations:
-    - key: workload
-      operator: Equal
-      value: critical
-      effect: NoSchedule
-  nodeSelector:
-    workload: critical
-  containers:
-    - name: app
-      image: your-image
-```
-
-## 🔍 Monitoring
-
-### Check Cluster Health
 ```bash
-kubectl get nodes
-kubectl get pods -A
-kubectl top nodes
+# View all outputs
+terraform output -json
+
+# Access specific values
+terraform output vpc_id
+terraform output private_subnet_ids
+terraform output database_subnet_ids
+terraform output deploy_role_arn
 ```
 
-### Monitor Karpenter
-```bash
-# Karpenter logs
-kubectl logs -f -n karpenter -l app.kubernetes.io/name=karpenter
+## Key Outputs
 
-# View provisioned nodes
-kubectl get nodes -l karpenter.sh/provisioner-name
+| Output | Value | Usage |
+|--------|-------|-------|
+| `vpc_id` | VPC ID | EKS cluster configuration |
+| `private_subnet_ids` | Subnet IDs (3) | EKS node groups |
+| `public_subnet_ids` | Subnet IDs (3) | Application load balancer |
+| `database_subnet_ids` | Subnet IDs (3) | RDS Multi-AZ, ElastiCache |
+| `nat_gateway_ids` | NAT GW IDs (3) | Network monitoring |
+| `availability_zones` | AZs (3) | Deployment planning |
+| `deploy_role_arn` | IAM Role ARN | CI/CD pipeline |
 
-# NodePool status
-kubectl describe nodepool general-purpose -n karpenter
-kubectl describe nodepool critical-workloads -n karpenter
-```
+## Files
 
-### Monitor Costs
-```bash
-# View Spot instance usage
-kubectl get nodes -l karpenter.sh/capacity-type=spot
+| File | Purpose |
+|------|---------|
+| `vpc.tf` | VPC module configuration (3 AZs, multi-NAT) |
+| `main.tf` | Deployment role setup |
+| `providers.tf` | AWS provider configuration |
+| `backend.tf` | S3 backend setup |
+| `backend.conf` | Backend configuration (partial) |
+| `outputs.tf` | Terraform outputs |
 
-# View on-demand instance usage
-kubectl get nodes -l karpenter.sh/capacity-type=on-demand
-```
+## Next Steps
 
-## 🚨 Production Best Practices
-
-### 1. **Pod Disruption Budgets**
-Always create PDBs for critical applications:
-
-```yaml
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: my-app-pdb
-spec:
-  minAvailable: 2
-  selector:
-    matchLabels:
-      app: my-app
-```
-
-### 2. **Resource Requests/Limits**
-Always set resource requests for proper scheduling:
-
-```yaml
-resources:
-  requests:
-    cpu: 100m
-    memory: 128Mi
-  limits:
-    cpu: 500m
-    memory: 512Mi
-```
-
-### 3. **Health Checks**
-Configure liveness and readiness probes:
-
-```yaml
-livenessProbe:
-  httpGet:
-    path: /health
-    port: 8080
-  initialDelaySeconds: 30
-  periodSeconds: 10
-
-readinessProbe:
-  httpGet:
-    path: /ready
-    port: 8080
-  initialDelaySeconds: 5
-  periodSeconds: 5
-```
-
-### 4. **Spot Instance Handling**
-Karpenter handles Spot interruptions automatically, but ensure:
-- Multiple replicas for critical services
-- Pod Disruption Budgets configured
-- Graceful shutdown handlers in apps
-
-## 📈 Scaling
-
-### Horizontal Pod Autoscaling (HPA)
-```bash
-kubectl autoscale deployment my-app --cpu-percent=70 --min=3 --max=10
-```
-
-### Karpenter Auto-Scaling
-Karpenter automatically provisions nodes based on pending pods. No manual configuration needed!
-
-## 🔐 Security Checklist
-
-- [ ] VPC Flow Logs enabled
-- [ ] CloudWatch logging enabled
-- [ ] IMDSv2 enforced on nodes
-- [ ] EBS encryption enabled
-- [ ] Security groups properly configured
-- [ ] IAM roles follow least privilege
-- [ ] Network policies configured
-- [ ] Pod Security Standards enforced
-
-## 💰 Cost Monitoring
-
-### Expected Monthly Costs (Estimate)
-
-**With Karpenter + SPOT:**
-- 5x t3.medium SPOT nodes: ~$45/month
-- NAT Gateway: ~$32/month
-- EKS control plane: $73/month
-- **Total: ~$150/month**
-
-**Without Karpenter (on-demand):**
-- 5x t3.medium on-demand: ~$150/month
-- NAT Gateway: ~$32/month
-- EKS control plane: $73/month
-- **Total: ~$255/month**
-
-**Savings: ~$105/month (41%)**
-
-## 📚 Additional Resources
-
-- [Karpenter Documentation](https://karpenter.sh/)
-- [EKS Best Practices](https://aws.github.io/aws-eks-best-practices/)
-- [AWS Load Balancer Controller](https://kubernetes-sigs.github.io/aws-load-balancer-controller/)
-- [Prometheus Operator](https://prometheus-operator.dev/)
+1. ✅ Deploy VPC (this phase)
+2. ⏳ Deploy EKS cluster with eks-blueprints
+3. ⏳ Deploy RDS database with Multi-AZ failover
+4. ⏳ Deploy Karpenter for intelligent auto-scaling
+5. ⏳ Deploy production microservices
 
 ## 🆘 Troubleshooting
 
-See [KARPENTER.md](../dev-app-account/KARPENTER.md) for detailed Karpenter troubleshooting guide.
+### Terraform Init Fails
 
-### Common Issues
+```
+Error: Failed to get existing workspaces
+```
 
-**Pods not scheduling?**
-- Check Karpenter logs
-- Verify subnet/SG tags
-- Check NodePool limits
+**Solution:** Verify backend.conf:
+```bash
+cat backend.conf
+# Should show:
+# - bucket = altanova-tf-state-eu-central-1
+# - key = prod-app-account/terraform.tfstate
+# - assume_role with TerraformStateAccessRole
+```
 
-**High costs?**
-- Review Spot vs on-demand ratio
-- Check for underutilized nodes
-- Verify consolidation is working
+### NAT Gateway Costs
 
-**Spot interruptions?**
-- Check Pod Disruption Budgets
-- Increase replica counts
-- Use critical NodePool for sensitive workloads
+If concerned about NAT costs (~$96/month):
+- VPC Endpoints can reduce data transfer costs
+- CloudFront can cache content
+- Consider multi-NAT only if truly necessary for prod
+
+### State Lock Issues
+
+```
+Error: Error acquiring the state lock
+```
+
+**Solution:** Release stuck lock (use with caution in prod!):
+```bash
+terraform force-unlock <LOCK_ID>
+```
+
+## Documentation
+
+- [ARCHITECTURE.md](../../docs/ARCHITECTURE.md) - Multi-account architecture
+- [INFRASTRUCTURE_BUILD_PLAN.md](../../docs/INFRASTRUCTURE_BUILD_PLAN.md) - Implementation roadmap
+- [PIPELINE.md](../../docs/PIPELINE.md) - CI/CD pipeline documentation
+- [VPC Module](../../modules/vpc) - VPC module documentation

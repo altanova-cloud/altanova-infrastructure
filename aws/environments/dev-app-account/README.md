@@ -1,169 +1,160 @@
-# Dev Environment - Infrastructure
+# Dev App Account Infrastructure
 
-This directory contains the Terraform configuration for the **Dev** environment infrastructure.
+This directory contains the Terraform configuration for the **Dev** environment VPC infrastructure.
 
 ## What's Deployed
 
-- ✅ VPC (172.16.0.0/16)
-- ✅ EKS Cluster v1.32
-- ✅ AWS Load Balancer Controller
-- ✅ Gateway API support
-- ✅ Cluster Autoscaler
-- ✅ Metrics Server
+- ✅ VPC (10.0.0.0/16)
+- ✅ Public Subnets (2 AZs)
+- ✅ Private Subnets (2 AZs)
+- ✅ Database Subnets (2 AZs)
+- ✅ NAT Gateway (1 for cost optimization)
+- ✅ VPC Flow Logs (CloudWatch)
 
 ## Architecture
 
 ```
 Dev Account (975050047325)
-├── VPC: 172.16.0.0/16
+├── VPC: 10.0.0.0/16 (eu-west-1)
 │   ├── Public Subnets
-│   │   ├── eu-west-1a: 172.16.0.0/24
-│   │   └── eu-west-1b: 172.16.1.0/24
+│   │   ├── eu-west-1a: 10.0.1.0/24 (ALB, NAT Gateway)
+│   │   └── eu-west-1b: 10.0.2.0/24 (ALB)
 │   │
 │   ├── Private Subnets
-│   │   ├── eu-west-1a: 172.16.2.0/24
-│   │   └── eu-west-1b: 172.16.3.0/24
+│   │   ├── eu-west-1a: 10.0.10.0/24 (EKS Nodes, Pods)
+│   │   └── eu-west-1b: 10.0.11.0/24 (EKS Nodes, Pods)
 │   │
-│   └── NAT Gateway: 1 (cost-optimized)
+│   ├── Database Subnets
+│   │   ├── eu-west-1a: 10.0.20.0/24 (RDS, ElastiCache)
+│   │   └── eu-west-1b: 10.0.21.0/24 (RDS, ElastiCache)
+│   │
+│   ├── NAT Gateway: 1 (cost-optimized)
+│   ├── Internet Gateway: Implicit
+│   └── VPC Flow Logs: Enabled to CloudWatch
 │
-└── EKS Cluster: altanova-dev
-    ├── Version: 1.32
-    ├── Node Group: general (t3.medium, 2-4 nodes)
-    └── Add-ons:
-        ├── AWS Load Balancer Controller
-        ├── Gateway API
-        ├── Cluster Autoscaler
-        └── Metrics Server
+└── Deployment Role: DevDeployRole (for CI/CD)
 ```
 
 ## Prerequisites
 
-1. **AWS Credentials** configured for Dev account
-2. **Terraform** >= 1.0
-3. **aws-vault** (recommended) or AWS CLI configured
-
-## Deployment
-
-### Step 1: Initialize Terraform
-
-```bash
-cd /Users/marwanghubein/tech-repo/landing-zones/aws/environments/dev-app-account
-
-# Initialize with backend configuration
-terraform init -backend-config=backend.conf
-```
-
-### Step 2: Plan
-
-```bash
-terraform plan
-```
-
-### Step 3: Apply
-
-```bash
-terraform apply
-```
-
-**Deployment time:** ~15-20 minutes
-
-## Post-Deployment
-
-### Configure kubectl
-
-```bash
-aws eks update-kubeconfig --region eu-west-1 --name altanova-dev
-```
-
-### Verify Cluster
-
-```bash
-# Check nodes
-kubectl get nodes
-
-# Check system pods
-kubectl get pods -A
-
-# Check Gateway API CRDs
-kubectl get crd | grep gateway
-```
-
-### Test Gateway API
-
-```bash
-# Create a test Gateway
-kubectl apply -f - <<EOF
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: dev-gateway
-spec:
-  gatewayClassName: aws-alb
-  listeners:
-    - name: http
-      protocol: HTTP
-      port: 80
-EOF
-
-# Check Gateway status
-kubectl get gateway dev-gateway
-```
+1. **AWS Credentials** configured for dev account (975050047325)
+2. **Terraform** >= 1.8
+3. Access to shared account state backend
 
 ## Cost Optimization
 
 **Dev environment is cost-optimized:**
 - ✅ Single NAT Gateway (~$32/month)
-- ✅ t3.medium instances (2-4 nodes)
-- ✅ Shorter log retention (7 days)
-- ✅ Optional add-ons disabled
+- ✅ 2 Availability Zones (vs 3 in prod)
+- ✅ Minimal VPC Flow Logs retention
+- ✅ Suitable for development/testing
 
-**Estimated monthly cost:** ~$150-200
+**Estimated monthly VPC cost:** ~$40-50 (NAT GW + data transfer)
 
-## Cleanup
+## Deployment
+
+### Initialize Terraform
 
 ```bash
-# Destroy all resources
-terraform destroy
+cd aws/environments/dev-app-account
+
+# Initialize with backend configuration
+terraform init -backend-config=backend.conf
+
+# Validate configuration
+terraform validate
+
+# Plan deployment
+terraform plan -out=tfplan.dev
 ```
+
+### Review and Apply
+
+```bash
+# Review the plan
+terraform show tfplan.dev
+
+# Apply infrastructure
+terraform apply tfplan.dev
+```
+
+**Deployment time:** ~5-10 minutes
+
+## Accessing Outputs
+
+After deployment:
+
+```bash
+# View all outputs
+terraform output -json
+
+# Access specific values
+terraform output vpc_id
+terraform output private_subnet_ids
+terraform output database_subnet_ids
+terraform output deploy_role_arn
+```
+
+## Key Outputs
+
+| Output | Value | Usage |
+|--------|-------|-------|
+| `vpc_id` | VPC ID | EKS cluster configuration |
+| `private_subnet_ids` | Subnet IDs | EKS node groups |
+| `public_subnet_ids` | Subnet IDs | Application load balancer |
+| `database_subnet_ids` | Subnet IDs | RDS, ElastiCache |
+| `nat_gateway_ids` | NAT GW IDs | Network monitoring |
+| `deploy_role_arn` | IAM Role ARN | CI/CD pipeline |
+
+## Next Steps
+
+1. ✅ Deploy VPC (this phase)
+2. ⏳ Deploy EKS cluster with eks-blueprints
+3. ⏳ Deploy RDS database
+4. ⏳ Deploy Karpenter for auto-scaling
+5. ⏳ Deploy microservices
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `vpc.tf` | VPC configuration |
-| `eks.tf` | EKS cluster configuration |
-| `providers.tf` | Provider configuration |
-| `backend.conf` | Remote state configuration |
-| `outputs.tf` | Output values |
-
-## Next Steps
-
-1. ✅ Deploy infrastructure
-2. ⏳ Deploy your microservices
-3. ⏳ Enable ArgoCD for GitOps
-4. ⏳ Enable monitoring (Prometheus/Grafana)
-5. ⏳ Enable logging (Fluent Bit)
+| `vpc.tf` | VPC module configuration |
+| `main.tf` | Deployment role setup |
+| `providers.tf` | AWS provider configuration |
+| `backend.tf` | S3 backend setup |
+| `backend.conf` | Backend configuration (partial) |
+| `outputs.tf` | Terraform outputs |
 
 ## Troubleshooting
 
-### Issue: Cannot assume role
+### Terraform Init Fails
 
-**Solution:** Ensure you're authenticated to the Dev account:
-```bash
-aws-vault exec dev-account -- terraform plan
+```
+Error: Failed to get existing workspaces
 ```
 
-### Issue: VPC already exists
+**Solution:** Verify backend.conf is correct:
+```bash
+cat backend.conf
+# Should show:
+# - bucket = altanova-tf-state-eu-central-1
+# - key = dev-app-account/terraform.tfstate
+# - assume_role with TerraformStateAccessRole
+```
 
-**Solution:** Import existing VPC or change CIDR block in `vpc.tf`
+### State Lock Issues
 
-### Issue: EKS cluster creation fails
+```
+Error: Error acquiring the state lock
+```
 
-**Solution:** Check IAM permissions and VPC configuration
+**Solution:** Release stuck lock (if needed):
+```bash
+terraform force-unlock <LOCK_ID>
+```
 
-## Support
+## Documentation
 
-For issues, check:
-- [EKS Blueprints Documentation](https://aws-ia.github.io/terraform-aws-eks-blueprints/)
-- [Gateway API Documentation](https://gateway-api.sigs.k8s.io/)
-- [AWS Load Balancer Controller](https://kubernetes-sigs.github.io/aws-load-balancer-controller/)
+- [ARCHITECTURE.md](../../docs/ARCHITECTURE.md) - Multi-account architecture
+- [INFRASTRUCTURE_BUILD_PLAN.md](../../docs/INFRASTRUCTURE_BUILD_PLAN.md) - Implementation roadmap
+- [VPC Module](../../modules/vpc) - VPC module documentation

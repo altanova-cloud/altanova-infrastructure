@@ -32,43 +32,84 @@ infrastructure/                         ← REFERENCE ONLY
 ### **VPC Module** ✅ DONE
 Location: `landing-zones/aws/modules/vpc/`
 
-**Based on your existing design:**
-- VPC: `172.16.0.0/16`
-- Public Zone A: `172.16.0.0/24`
-- Public Zone B: `172.16.1.0/24`
-- Private Zone A: `172.16.2.0/24`
-- Private Zone B: `172.16.3.0/24`
+**Reusable VPC Module Features:**
+- Auto-calculated subnet CIDRs using `cidrsubnet()` function
+- Supports 2-3 Availability Zones (configurable)
+- Public, Private, and Database subnets
+- Single or per-AZ NAT Gateway configuration
+- VPC Flow Logs to CloudWatch
+- Proper EKS discovery tags
+- Security group management
 
-**Features:**
-- 2 Availability Zones
-- Public subnets (for ALB, NAT)
-- Private subnets (for EKS nodes)
-- NAT Gateway (1 for dev, 2 for prod)
-- Proper EKS tags
-- VPC Flow Logs
+**Module Location & Files:**
+- `aws/modules/vpc/main.tf` - VPC resource definitions
+- `aws/modules/vpc/variables.tf` - Input variables
+- `aws/modules/vpc/outputs.tf` - Exported values
+- `aws/modules/vpc/REVIEW.md` - Known issues & recommendations
 
 ---
 
-## 📋 Next Steps
+## 📋 Deployment Progress
 
-### Step 1: Create EKS Blueprints Module ⏳
+### Phase 1: VPC Infrastructure ✅ IN PROGRESS
+
+#### Step 1: VPC Module Creation ✅ DONE
+- ✅ `aws/modules/vpc/main.tf` - Complete
+- ✅ `aws/modules/vpc/variables.tf` - Complete
+- ✅ `aws/modules/vpc/outputs.tf` - Complete
+- ✅ `aws/modules/vpc/REVIEW.md` - Quality assurance document
+
+#### Step 2: Dev Environment VPC Configuration ✅ DONE
+Location: `aws/environments/dev-app-account/`
+
+Files created/updated:
+- ✅ `vpc.tf` - VPC module configured (10.0.0.0/16, 2 AZs)
+- ✅ `providers.tf` - AWS provider configuration
+- ✅ `outputs.tf` - VPC outputs exported
+- ✅ `backend.conf` - State key path standardized
+- ✅ `README.md` - Deployment documentation
+- ✅ `main.tf` - Deployment role configuration (unchanged)
+
+**Config Details:**
+- VPC CIDR: 10.0.0.0/16
+- AZs: eu-west-1a, eu-west-1b (2 for cost optimization)
+- Public Subnets: 10.0.1.0/24, 10.0.2.0/24
+- Private Subnets: 10.0.10.0/24, 10.0.11.0/24
+- Database Subnets: 10.0.20.0/24, 10.0.21.0/24
+- NAT Gateways: 1 (single for dev cost optimization)
+- VPC Flow Logs: Enabled
+
+#### Step 3: Prod Environment VPC Configuration ✅ DONE
+Location: `aws/environments/prod-app-account/`
+
+Files created/updated:
+- ✅ `vpc.tf` - VPC module configured (10.1.0.0/16, 3 AZs, HA)
+- ✅ `providers.tf` - AWS provider configuration
+- ✅ `outputs.tf` - VPC outputs exported
+- ✅ `README.md` - Deployment documentation (with prod emphasis)
+- ✅ `main.tf` - Deployment role configuration (unchanged)
+
+**Config Details:**
+- VPC CIDR: 10.1.0.0/16
+- AZs: eu-west-1a, eu-west-1b, eu-west-1c (3 for HA)
+- Public Subnets: 10.1.1.0/24, 10.1.2.0/24, 10.1.3.0/24
+- Private Subnets: 10.1.10.0/24, 10.1.11.0/24, 10.1.12.0/24
+- Database Subnets: 10.1.20.0/24, 10.1.21.0/24, 10.1.22.0/24
+- NAT Gateways: 3 (one per AZ for HA)
+- VPC Flow Logs: Enabled
+
+### Phase 2: EKS Deployment ⏳ NEXT
 Location: `landing-zones/aws/modules/eks-blueprints/`
 
-This will wrap AWS EKS Blueprints with our configuration.
+**Tasks:**
+- Create EKS Blueprints module wrapper
+- Deploy to dev environment
+- Deploy to prod environment (with HA configuration)
 
-### Step 2: Deploy Dev Environment ⏳
-Location: `landing-zones/aws/environments/dev-app-account/`
-
-Files to create:
-- `vpc.tf` - Use VPC module
-- `eks.tf` - Use EKS Blueprints module
-- Update `backend.tf`
-- Update `terraform.tfvars`
-
-### Step 3: Deploy Prod Environment ⏳
-Location: `landing-zones/aws/environments/prod-app-account/`
-
-Same as dev but with HA configuration.
+### Phase 3: Additional Infrastructure ⏳ FUTURE
+- RDS databases (dev and prod)
+- ElastiCache (dev and prod)
+- S3 buckets per environment
 
 ---
 
@@ -94,23 +135,58 @@ VPC: 172.17.0.0/16  (different range)
 
 ---
 
-## ✅ What's Complete
+## ✅ Phase 1 Completion Status
 
-- [x] VPC Module created in landing-zones
-- [x] Matches your existing subnet design
-- [x] Supports dev (1 NAT) and prod (2 NAT)
-- [x] Proper EKS tags
-- [x] VPC Flow Logs
+### Core VPC Module
+- [x] VPC module created and reviewed
+- [x] Auto-calculated subnet allocation
+- [x] EKS discovery tags
+- [x] VPC Flow Logs enabled by default
+- [x] NAT Gateway configuration (single and per-AZ)
+
+### Dev Environment
+- [x] VPC module instantiation
+- [x] Provider configuration
+- [x] Output exports
+- [x] Backend configuration
+- [x] State key path standardized
+- [x] README documentation
+- [x] Database subnets enabled
+
+### Prod Environment
+- [x] VPC module instantiation (3 AZs, multi-NAT)
+- [x] Provider configuration
+- [x] Output exports
+- [x] Backend configuration (unchanged)
+- [x] README documentation (with prod guidance)
+- [x] Database subnets enabled
+
+### Documentation & Safety
+- [x] Both environments match ARCHITECTURE.md CIDR scheme
+- [x] Shared account infrastructure untouched
+- [x] S3 state bucket remains safe
+- [x] DynamoDB lock table untouched
+- [x] Cross-account IAM roles verified
+
+## ⏳ What's Next (Phase 2+)
+
+1. **EKS Deployment** - Create eks-blueprints module
+2. **RDS Deployment** - Multi-AZ databases
+3. **Karpenter Setup** - Node autoscaling
+4. **Microservices** - Application deployment
 
 ---
 
-## ⏳ What's Next
+## 📊 Infrastructure Costs (VPC Only)
 
-- [ ] Create EKS Blueprints module
-- [ ] Deploy to dev-app-account
-- [ ] Deploy to prod-app-account
-- [ ] Deploy your microservices
+| Environment | NAT Gateways | Monthly Cost |
+|-------------|--------------|--------------|
+| Dev | 1 | ~$32 |
+| Prod | 3 | ~$96 |
+| **Total** | **4** | **~$128** |
+
+*Plus CloudWatch logs and data transfer costs (~$10/month)*
 
 ---
 
-**Ready to create the EKS Blueprints module?**
+**VPC Infrastructure is ready for deployment!**

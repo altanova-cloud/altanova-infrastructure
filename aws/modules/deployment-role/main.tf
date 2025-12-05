@@ -1,31 +1,18 @@
 resource "aws_iam_role" "deployment" {
   name = "${title(var.environment)}DeployRole"
 
-  assume_role_policy = var.environment == "prod" ? jsonencode({
+  assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
         Effect = "Allow"
         Principal = {
-          AWS = var.gitlab_runner_role_arn
+          AWS = var.github_actions_role_arn
         }
-        Action = "sts:AssumeRole"
-        Condition = {
-          StringEquals = {
-            "sts:ExternalId" = "production-deployment"
-          }
-        }
-      }
-    ]
-    }) : jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Principal = {
-          AWS = var.gitlab_runner_role_arn
-        }
-        Action = "sts:AssumeRole"
+        Action = [
+          "sts:AssumeRole",
+          "sts:TagSession"
+        ]
       }
     ]
   })
@@ -34,7 +21,7 @@ resource "aws_iam_role" "deployment" {
     Name        = "${title(var.environment)}DeployRole"
     Environment = var.environment
     ManagedBy   = "Terraform"
-    Purpose     = "GitLab CI/CD deployment role"
+    Purpose     = "GitHub Actions deployment role"
   }
 }
 

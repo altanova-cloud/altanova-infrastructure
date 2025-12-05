@@ -35,6 +35,27 @@ module "github_oidc" {
   }
 }
 
+# Inline policy to allow GitHubActionsRole to assume Dev/Prod deploy roles
+resource "aws_iam_role_policy" "cross_account_assume" {
+  name = "CrossAccountAssume"
+  role = module.github_oidc.role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "sts:AssumeRole",
+        "sts:TagSession"
+      ]
+      Resource = [
+        "arn:aws:iam::${var.dev_account_id}:role/DevDeployRole",
+        "arn:aws:iam::${var.prod_account_id}:role/ProdDeployRole"
+      ]
+    }]
+  })
+}
+
 output "state_bucket_arn" {
   value = module.bootstrap.s3_bucket_arn
 }

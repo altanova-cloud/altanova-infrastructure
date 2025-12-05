@@ -14,14 +14,16 @@ module "vpc" {
   # Private: 10.1.10.0/24, 10.1.11.0/24, 10.1.12.0/24
   # Database: 10.1.20.0/24, 10.1.21.0/24, 10.1.22.0/24
 
-  # Enable database subnets and subnet group for RDS/ElastiCache
-  # Database subnets are created by default when using this module
-
   # Enable VPC Flow Logs for security and compliance
   enable_flow_logs = true
 
-  # High Availability: Use one NAT Gateway per AZ for production
-  single_nat_gateway = false
+  # Database subnets disabled for now (no RDS/ElastiCache planned)
+  # Set to true when needed
+  enable_database_subnets = false
+
+  # Single NAT for cost savings (no app deployed yet)
+  # Set to false for HA when production workloads are running
+  single_nat_gateway = true
 
   tags = {
     Environment = "prod"

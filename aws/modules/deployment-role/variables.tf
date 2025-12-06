@@ -7,8 +7,8 @@ variable "environment" {
   }
 }
 
-variable "gitlab_runner_role_arn" {
-  description = "ARN of GitLab Runner role in Shared Account that will assume this role"
+variable "github_actions_role_arn" {
+  description = "ARN of GitHub Actions role in Shared Account that will assume this role"
   type        = string
 }
 

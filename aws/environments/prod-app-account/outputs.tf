@@ -26,5 +26,5 @@ output "nat_gateway_ids" {
 
 output "availability_zones" {
   description = "List of availability zones used"
-  value       = module.vpc.azs
+  value       = module.vpc.availability_zones
 }

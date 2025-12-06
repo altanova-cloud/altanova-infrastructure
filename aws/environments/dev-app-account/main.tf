@@ -4,9 +4,9 @@ terraform {
 module "deployment_role" {
   source = "../../modules/deployment-role"
 
-  environment            = "dev"
-  gitlab_runner_role_arn = var.gitlab_runner_role_arn
-  state_access_role_arn  = var.state_access_role_arn
+  environment             = "dev"
+  github_actions_role_arn = var.github_actions_role_arn
+  state_access_role_arn   = var.state_access_role_arn
 }
 
 output "deploy_role_arn" {

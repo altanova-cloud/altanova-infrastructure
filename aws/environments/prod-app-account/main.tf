@@ -37,6 +37,13 @@ module "vpc" {
   # Database subnet group
   create_database_subnet_group = true
 
+  # Production Security Hardening
+  # Lock down default security group (forces explicit SG creation)
+  manage_default_security_group  = true
+  default_security_group_name    = "${local.project_name}-${local.environment}-${local.region_code}-default-sg"
+  default_security_group_ingress = []
+  default_security_group_egress  = []
+
   # VPC Flow Logs
   enable_flow_log                      = true
   flow_log_destination_type            = "cloud-watch-logs"

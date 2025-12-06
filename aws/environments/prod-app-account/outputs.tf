@@ -63,6 +63,14 @@ output "availability_zones" {
 }
 
 # -----------------------------------------------------------------------------
+# Security Groups
+# -----------------------------------------------------------------------------
+output "default_security_group_id" {
+  description = "ID of the default security group (locked down)"
+  value       = module.vpc.default_security_group_id
+}
+
+# -----------------------------------------------------------------------------
 # IAM
 # -----------------------------------------------------------------------------
 output "deploy_role_arn" {

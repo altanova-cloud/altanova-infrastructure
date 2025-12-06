@@ -37,6 +37,9 @@ module "vpc" {
   # Database subnet group
   create_database_subnet_group = true
 
+  # Dev: Relaxed security for development flexibility
+  # Note: Production has hardened defaults, dev allows standard AWS defaults for easier testing
+
   # VPC Flow Logs
   enable_flow_log                      = true
   flow_log_destination_type            = "cloud-watch-logs"

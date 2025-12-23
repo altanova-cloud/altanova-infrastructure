@@ -58,6 +58,22 @@ resource "aws_iam_role_policy" "deployment" {
         ]
         Resource = "*"
       },
+      # Secrets Manager permissions
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:CreateSecret",
+          "secretsmanager:DeleteSecret",
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:PutSecretValue",
+          "secretsmanager:UpdateSecret",
+          "secretsmanager:TagResource",
+          "secretsmanager:UntagResource",
+          "secretsmanager:ListSecrets"
+        ]
+        Resource = "*"
+      },
       # S3 permissions (excluding state bucket)
       {
         Effect = "Allow"

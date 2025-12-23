@@ -85,9 +85,9 @@ module "rds" {
 
   # Engine configuration
   engine               = "postgres"
-  engine_version       = "16.4"
-  family               = "postgres16"
-  major_engine_version = "16"
+  engine_version       = "18.1"
+  family               = "postgres18"
+  major_engine_version = "18"
   instance_class       = "db.t3.micro" # Free tier eligible
 
   # Storage - Free tier: 20GB

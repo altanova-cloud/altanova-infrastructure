@@ -128,7 +128,11 @@ resource "aws_iam_role_policy" "deployment" {
           "iam:DeletePolicy",
           "iam:CreatePolicyVersion",
           "iam:DeletePolicyVersion",
-          "iam:PassRole"
+          "iam:PassRole",
+          "iam:TagRole",
+          "iam:UntagRole",
+          "iam:TagPolicy",
+          "iam:UntagPolicy"
         ]
         Resource = "*"
       },

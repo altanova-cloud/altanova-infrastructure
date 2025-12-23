@@ -85,7 +85,7 @@ module "rds" {
 
   # Engine configuration
   engine               = "postgres"
-  engine_version       = "16.4"
+  engine_version       = "16.11"
   family               = "postgres16"
   major_engine_version = "16"
   instance_class       = "db.t3.micro" # Free tier eligible

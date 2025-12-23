@@ -134,7 +134,7 @@ module "rds" {
   parameters = [
     {
       name  = "log_connections"
-      value = "1"
+      value = "receipt,authentication,authorization"
     },
     {
       name  = "log_disconnections"

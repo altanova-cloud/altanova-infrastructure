@@ -8,6 +8,7 @@ on:
       - 'aws/environments/shared-account/**'
       - 'aws/modules/bootstrap/**'
       - 'aws/modules/github-oidc/**'
+      - 'aws/modules/deployment-role/**'
       - '.github/workflows/terraform-shared.yml'
 
   push:

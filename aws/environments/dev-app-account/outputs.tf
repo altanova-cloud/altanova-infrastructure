@@ -82,3 +82,37 @@ output "deploy_role_name" {
   description = "Name of the deployment role"
   value       = module.deployment_role.role_name
 }
+
+# -----------------------------------------------------------------------------
+# RDS PostgreSQL
+# -----------------------------------------------------------------------------
+output "rds_endpoint" {
+  description = "RDS PostgreSQL endpoint"
+  value       = module.rds.db_instance_endpoint
+}
+
+output "rds_address" {
+  description = "RDS PostgreSQL address (hostname)"
+  value       = module.rds.db_instance_address
+}
+
+output "rds_port" {
+  description = "RDS PostgreSQL port"
+  value       = module.rds.db_instance_port
+}
+
+output "rds_database_name" {
+  description = "RDS PostgreSQL database name"
+  value       = module.rds.db_instance_name
+}
+
+output "rds_security_group_id" {
+  description = "Security group ID for RDS"
+  value       = aws_security_group.rds.id
+}
+
+output "rds_secret_arn" {
+  description = "ARN of Secrets Manager secret containing DB credentials"
+  value       = aws_secretsmanager_secret.db_password.arn
+  sensitive   = true
+}

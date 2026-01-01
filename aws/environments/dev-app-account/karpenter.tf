@@ -27,7 +27,6 @@
 #   │                                                                      │
 #   │   APPLICATION NODES (Karpenter-Managed - Dynamic)                    │
 #   │   ├── General NodePool: t3/m5/c5 instances (spot preferred)          │
-#   │   ├── Critical NodePool: on-demand only for critical workloads       │
 #   │   └── GPU NodePool: g4dn instances (scale-to-zero)                   │
 #   │                                                                      │
 #   └─────────────────────────────────────────────────────────────────────┘
@@ -281,83 +280,6 @@ resource "kubectl_manifest" "karpenter_node_pool_general" {
       # Weight: Lower number = lower priority
       # GPU pool has weight 100, so it's preferred for GPU workloads
       weight: 10
-  YAML
-
-  depends_on = [kubectl_manifest.karpenter_node_class]
-}
-
-
-# =============================================================================
-# NodePool: CRITICAL (on-demand only for important workloads)
-# =============================================================================
-# For workloads that cannot tolerate spot interruptions.
-#
-# Design decisions:
-#   - ON-DEMAND ONLY: No spot interruption risk
-#   - TAINTED: Pods must explicitly tolerate to schedule here
-#   - CONSERVATIVE CONSOLIDATION: 5 minutes to avoid churn
-#   - SMALLER LIMITS: Critical workloads should be minimal
-# =============================================================================
-resource "kubectl_manifest" "karpenter_node_pool_critical" {
-  yaml_body = <<-YAML
-    apiVersion: karpenter.sh/v1
-    kind: NodePool
-    metadata:
-      name: critical
-    spec:
-      template:
-        metadata:
-          labels:
-            nodepool: critical
-        spec:
-          requirements:
-            - key: kubernetes.io/arch
-              operator: In
-              values: ["amd64"]
-            - key: kubernetes.io/os
-              operator: In
-              values: ["linux"]
-
-            # ON-DEMAND ONLY: No spot for critical workloads
-            - key: karpenter.sh/capacity-type
-              operator: In
-              values: ["on-demand"]
-
-            # Limit to general-purpose instances
-            - key: karpenter.k8s.aws/instance-category
-              operator: In
-              values: ["t", "m"]
-            - key: karpenter.k8s.aws/instance-size
-              operator: In
-              values: ["small", "medium"]
-
-          nodeClassRef:
-            group: karpenter.k8s.aws
-            kind: EC2NodeClass
-            name: default
-
-          # TAINT: Only pods with matching toleration can schedule here
-          # Prevents accidental scheduling of non-critical workloads
-          taints:
-            - key: workload
-              value: critical
-              effect: NoSchedule
-
-          expireAfter: 720h
-
-      # Conservative consolidation: Only when completely empty
-      # Longer wait time reduces churn for stable workloads
-      disruption:
-        consolidationPolicy: WhenEmpty
-        consolidateAfter: 5m
-
-      # Smaller limits - critical workloads should be minimal
-      limits:
-        cpu: 20
-        memory: 40Gi
-
-      # Lower priority than general pool
-      weight: 5
   YAML
 
   depends_on = [kubectl_manifest.karpenter_node_class]

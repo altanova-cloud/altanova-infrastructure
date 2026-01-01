@@ -29,14 +29,6 @@ This directory contains a complete EKS cluster setup with Karpenter-based node a
 │  │  └────────────────────────────────────────────────────────────┘  │   │
 │  │                                                                   │   │
 │  │  ┌────────────────────────────────────────────────────────────┐  │   │
-│  │  │ Critical NodePool (On-Demand Only)                         │  │   │
-│  │  │ • Instances: t3/m5.small-medium                            │  │   │
-│  │  │ • Consolidation: 5 minutes (conservative)                  │  │   │
-│  │  │ • Taint: workload=critical:NoSchedule                      │  │   │
-│  │  │ • Limits: 20 vCPU, 40Gi RAM                                │  │   │
-│  │  └────────────────────────────────────────────────────────────┘  │   │
-│  │                                                                   │   │
-│  │  ┌────────────────────────────────────────────────────────────┐  │   │
 │  │  │ GPU NodePool (Scale-to-Zero) 🎯                            │  │   │
 │  │  │ • Instances: g4dn.xlarge/2xlarge (Spot preferred)          │  │   │
 │  │  │ • GPU: NVIDIA T4 (16GB VRAM)                               │  │   │
@@ -96,7 +88,6 @@ aws/environments/dev-app-account/
 | Pool | Purpose | Instance Types | Capacity | Consolidation | Taint |
 |------|---------|---------------|----------|---------------|-------|
 | **general** | Default workloads | t3/m5/c5.small-large | Spot+OD | 1 min | None |
-| **critical** | Critical workloads | t3/m5.small-medium | OD only | 5 min | workload=critical |
 | **gpu-inference** | ML inference | g4dn.xlarge/2xlarge | Spot+OD | 5 min | nvidia.com/gpu |
 
 ### 4. NVIDIA Device Plugin ([nvidia-device-plugin.tf](nvidia-device-plugin.tf))
@@ -179,7 +170,7 @@ kubectl get pods -n kube-system -l app.kubernetes.io/name=nvidia-device-plugin
 
 # Check NodePools
 kubectl get nodepools
-# Expected: general, critical, gpu-inference
+# Expected: general, gpu-inference
 
 # Check EC2NodeClasses
 kubectl get ec2nodeclasses

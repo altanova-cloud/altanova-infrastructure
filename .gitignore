@@ -37,3 +37,8 @@ docker-compose.override.yml
 .DS_Store
 .idea/
 .vscode/
+
+# Documentation and context files (not for version control)
+context/
+BOOTCAMP.md
+CLAUDE.md

@@ -38,3 +38,9 @@ variable "github_oidc_provider_arn" {
   description = "ARN of the GitHub OIDC provider (already created in AWS)"
   type        = string
 }
+
+variable "domain_name" {
+  description = "Primary domain name for the platform (registered at external registrar)"
+  type        = string
+  default     = "altanova.cloud"
+}

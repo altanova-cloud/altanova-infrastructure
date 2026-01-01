@@ -116,3 +116,91 @@ output "rds_secret_arn" {
   value       = aws_secretsmanager_secret.db_password.arn
   sensitive   = true
 }
+
+# -----------------------------------------------------------------------------
+# EKS Cluster
+# -----------------------------------------------------------------------------
+output "eks_cluster_name" {
+  description = "EKS cluster name"
+  value       = module.eks.cluster_name
+}
+
+output "eks_cluster_endpoint" {
+  description = "EKS cluster API endpoint"
+  value       = module.eks.cluster_endpoint
+}
+
+output "eks_cluster_version" {
+  description = "EKS cluster Kubernetes version"
+  value       = module.eks.cluster_version
+}
+
+output "eks_cluster_arn" {
+  description = "EKS cluster ARN"
+  value       = module.eks.cluster_arn
+}
+
+output "eks_cluster_certificate_authority_data" {
+  description = "Base64 encoded certificate data for cluster authentication"
+  value       = module.eks.cluster_certificate_authority_data
+  sensitive   = true
+}
+
+output "eks_oidc_provider_arn" {
+  description = "OIDC provider ARN for IRSA"
+  value       = module.eks.oidc_provider_arn
+}
+
+output "eks_cluster_security_group_id" {
+  description = "Security group ID attached to the EKS cluster"
+  value       = module.eks.cluster_security_group_id
+}
+
+output "eks_node_security_group_id" {
+  description = "Security group ID attached to EKS nodes"
+  value       = module.eks.node_security_group_id
+}
+
+# -----------------------------------------------------------------------------
+# Karpenter
+# -----------------------------------------------------------------------------
+output "karpenter_iam_role_arn" {
+  description = "Karpenter controller IAM role ARN"
+  value       = module.karpenter.iam_role_arn
+}
+
+output "karpenter_node_iam_role_arn" {
+  description = "Karpenter node IAM role ARN"
+  value       = module.karpenter.node_iam_role_arn
+}
+
+output "karpenter_node_iam_role_name" {
+  description = "Karpenter node IAM role name"
+  value       = module.karpenter.node_iam_role_name
+}
+
+output "karpenter_queue_name" {
+  description = "Karpenter SQS queue name for spot interruption handling"
+  value       = module.karpenter.queue_name
+}
+
+# -----------------------------------------------------------------------------
+# Kubeconfig Command
+# -----------------------------------------------------------------------------
+output "kubeconfig_command" {
+  description = "Command to update kubeconfig for kubectl access"
+  value       = "aws eks update-kubeconfig --region eu-west-1 --name ${module.eks.cluster_name}"
+}
+
+# -----------------------------------------------------------------------------
+# ACM Certificate
+# -----------------------------------------------------------------------------
+output "acm_certificate_arn" {
+  description = "ARN of the wildcard ACM certificate"
+  value       = aws_acm_certificate.wildcard.arn
+}
+
+output "acm_certificate_domain" {
+  description = "Domain name covered by the certificate"
+  value       = aws_acm_certificate.wildcard.domain_name
+}

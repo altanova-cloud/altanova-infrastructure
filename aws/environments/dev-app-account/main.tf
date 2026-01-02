@@ -78,14 +78,14 @@ module "vpc" {
 
   # Subnet tags for EKS discovery
   public_subnet_tags = {
-    Tier                                                                        = "Public"
-    "kubernetes.io/role/elb"                                                    = "1"
+    Tier                                                                                        = "Public"
+    "kubernetes.io/role/elb"                                                                    = "1"
     "kubernetes.io/cluster/${local.project_name}-${local.environment}-${local.region_code}-eks" = "shared"
   }
 
   private_subnet_tags = {
-    Tier                                                                        = "Private"
-    "kubernetes.io/role/internal-elb"                                           = "1"
+    Tier                                                                                        = "Private"
+    "kubernetes.io/role/internal-elb"                                                           = "1"
     "kubernetes.io/cluster/${local.project_name}-${local.environment}-${local.region_code}-eks" = "shared"
   }
 

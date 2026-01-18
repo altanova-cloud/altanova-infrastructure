@@ -20,7 +20,7 @@ stages:
 
 variables:
   AWS_REGION: "us-east-1"
-  TF_VERSION: "1.8"
+  TF_VERSION: "1.8.7"
 
 # Cache for Terraform
 .terraform_cache:
@@ -43,10 +43,12 @@ variables:
     - apt-get install -y --no-install-recommends curl unzip awscli
 
     # Download and install Terraform
-    - curl -s https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip -o terraform.zip
+    - echo "Installing Terraform ${TF_VERSION}..."
+    - curl -fSL https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip -o terraform.zip
     - unzip -q terraform.zip
     - mv terraform /usr/local/bin/
     - rm terraform.zip
+    - terraform version
 
     # Get OIDC token and assume AWS role
     - export GITLAB_JWT=$CI_JOB_JWT

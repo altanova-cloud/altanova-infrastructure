@@ -233,7 +233,8 @@ altanova-infrastructure/
 │   ├── workflows/
 │   │   ├── terraform-shared.yml          ← Phase 1: Shared Account
 │   │   ├── terraform-dev.yml             ← Phase 3: Dev Account (auto-apply)
-│   │   └── terraform-prod.yml            ← Phase 3: Prod Account (manual approval)
+│   │   ├── terraform-prod.yml            ← Phase 3: Prod Account (manual approval)
+│   │   └── terraform-dev-destroy.yml     ← Dev Destroy (multi-gate protection)
 │   │
 │   └── CODEOWNERS                         ← Infra team ownership
 │       # aws/environments/shared-account/ @altanova-cloud/infra-team
@@ -817,7 +818,8 @@ fail_on_findings: true
 .github/workflows/
 ├── terraform-shared.yml      ← Phase 1 (Shared Account) ✅
 ├── terraform-dev.yml         ← Phase 3 (Dev Account) ✅ IMPLEMENTED
-└── terraform-prod.yml        ← Phase 3 (Prod Account) ✅ IMPLEMENTED
+├── terraform-prod.yml        ← Phase 3 (Prod Account) ✅ IMPLEMENTED
+└── terraform-dev-destroy.yml ← Dev Destroy (Multi-Gate Protection) ✅ NEW
 ```
 
 **Decision:** Separate workflow files (not matrix) for:
@@ -988,6 +990,153 @@ Note: dev-account environment NOT required (auto-apply without approval)
 │ Infrastructure deployed to Prod Account                        │
 └────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## 🔴 Infrastructure Destroy Workflow (Dev Only)
+
+### Purpose
+
+A secure, multi-gate workflow for destroying Dev infrastructure (EKS, RDS) for testing rebuild cycles.
+
+### Workflow File: `.github/workflows/terraform-dev-destroy.yml`
+
+### Safety Gates Implemented
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    DESTROY WORKFLOW SAFEGUARDS                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Gate 1: Manual Trigger Only                                     │
+│  └── Cannot be triggered by push/PR (workflow_dispatch only)     │
+│                                                                  │
+│  Gate 2: Confirmation String                                     │
+│  └── Must type "DESTROY-DEV" exactly (case-sensitive)            │
+│                                                                  │
+│  Gate 3: Resource Selection                                      │
+│  └── Must choose: eks-only | rds-only | eks-and-rds              │
+│                                                                  │
+│  Gate 4: Dry Run (Default)                                       │
+│  └── Shows destroy plan without destroying (recommended first)   │
+│                                                                  │
+│  Gate 5: GitHub Environment Approval                             │
+│  └── Requires manual approval in GitHub UI                       │
+│                                                                  │
+│  Gate 6: 60-Second Countdown                                     │
+│  └── Final chance to cancel before destroy executes              │
+│                                                                  │
+│  Gate 7: Full Audit Logging                                      │
+│  └── All outputs saved as artifacts (90-day retention)           │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Workflow Flow
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│ Step 1: Developer triggers workflow manually                    │
+│ ├── Actions → terraform-dev-destroy.yml → Run workflow         │
+│ ├── Type "DESTROY-DEV" in confirmation field                   │
+│ ├── Select resources (eks-only, rds-only, eks-and-rds)         │
+│ └── Enable/disable dry run                                     │
+└────────────────────────────────────────────────────────────────┘
+                          ↓
+┌────────────────────────────────────────────────────────────────┐
+│ Step 2: Safety Check Job                                        │
+│ └── Validates "DESTROY-DEV" confirmation string                │
+└────────────────────────────────────────────────────────────────┘
+                          ↓
+┌────────────────────────────────────────────────────────────────┐
+│ Step 3: Destroy Plan Job                                        │
+│ ├── terraform plan -destroy -target=<selected_resources>       │
+│ ├── Shows what WILL be destroyed                               │
+│ └── Uploads plan artifact for audit                            │
+└────────────────────────────────────────────────────────────────┘
+                          ↓
+                    ┌──────────────────┐
+                    │  Dry Run Mode?   │
+                    └────────┬─────────┘
+                             │
+              ┌──────────────┴──────────────┐
+              │                             │
+              ▼ (dry_run=true)              ▼ (dry_run=false)
+┌──────────────────────────┐    ┌──────────────────────────────┐
+│ ✅ Dry Run Complete      │    │ Step 4: Approval Gate         │
+│ Shows plan, no action    │    │ ⚠️ Requires GitHub approval  │
+└──────────────────────────┘    │ Environment: dev-destroy-     │
+                                │             approval          │
+                                └──────────────┬───────────────┘
+                                               ↓
+                                ┌──────────────────────────────┐
+                                │ Step 5: Execute Destroy       │
+                                │ ├── 60-second countdown       │
+                                │ ├── terraform apply destroy   │
+                                │ └── Upload output artifact    │
+                                └──────────────────────────────┘
+```
+
+### Required GitHub Configuration
+
+**Create GitHub Environment for Destroy Approval:**
+
+```
+Settings → Environments → New environment
+
+Environment Name: dev-destroy-approval
+
+Protection Rules:
+├── ✅ Required reviewers: 1-2 (must be different from initiator)
+├── Reviewers: @devops-team or specific users
+├── ✅ Prevent self-review (optional but recommended)
+└── Deployment branches: All branches (workflow_dispatch only anyway)
+```
+
+### Usage Instructions
+
+**Step 1: Dry Run First (Recommended)**
+```
+1. Go to Actions → "🔴 DESTROY - Dev Account Infrastructure"
+2. Click "Run workflow"
+3. Fill in:
+   - confirmation: DESTROY-DEV
+   - resources: eks-and-rds (or specific)
+   - dry_run: ✅ checked (true)
+4. Click "Run workflow"
+5. Review the destroy plan in workflow summary
+```
+
+**Step 2: Actual Destroy**
+```
+1. Go to Actions → "🔴 DESTROY - Dev Account Infrastructure"
+2. Click "Run workflow"
+3. Fill in:
+   - confirmation: DESTROY-DEV
+   - resources: eks-and-rds (or specific)
+   - dry_run: ❌ unchecked (false)
+4. Click "Run workflow"
+5. Wait for approval request
+6. Go to the running workflow → "Review deployments"
+7. Approve the "dev-destroy-approval" environment
+8. Wait for 60-second countdown
+9. Infrastructure destroyed
+```
+
+### Resources Targeted by Selection
+
+| Selection | Resources Destroyed |
+|-----------|---------------------|
+| `eks-only` | EKS cluster, Karpenter, NodePools, ALB Controller, related IAM |
+| `rds-only` | RDS instance, DB subnet group, Security group, Secrets Manager |
+| `eks-and-rds` | All of the above |
+
+### Artifacts Retained
+
+| Artifact | Retention | Purpose |
+|----------|-----------|---------|
+| `destroy-plan-dev-*` | 7 days | Audit what was planned |
+| `destroy-output-dev-*` | 90 days | Audit what was destroyed |
 
 ---
 

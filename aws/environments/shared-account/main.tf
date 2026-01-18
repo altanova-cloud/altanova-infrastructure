@@ -82,11 +82,6 @@ resource "aws_iam_role" "gitlab_runner" {
         Federated = aws_iam_openid_connect_provider.gitlab.arn
       }
       Action = "sts:AssumeRoleWithWebIdentity"
-      Condition = {
-        StringEquals = {
-          "gitlab.com:aud" = "sts.amazonaws.com"
-        }
-      }
     }]
   })
 

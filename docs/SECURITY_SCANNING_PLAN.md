@@ -22,7 +22,7 @@ Add automated security scanning to the Terraform CI/CD pipeline using Checkov an
 
 ### Pipeline Configuration
 
-#### [MODIFY] [.gitlab-ci.yml](file:///Users/marwanghubein/tech-repo/landing-zones/.gitlab-ci.yml)
+#### [MODIFY] [.gitlab-ci.yml](file:///Users/marwanghubein/tech-repo/AltanovaLLM/.gitlab-ci.yml)
 
 **Add security stage:**
 - New stage: `security` (runs before `validate`)
@@ -41,7 +41,7 @@ Add automated security scanning to the Terraform CI/CD pipeline using Checkov an
 
 ### Security Scanner Configuration
 
-#### [NEW] [.checkov.yaml](file:///Users/marwanghubein/tech-repo/landing-zones/.checkov.yaml)
+#### [NEW] [.checkov.yaml](file:///Users/marwanghubein/tech-repo/AltanovaLLM/.checkov.yaml)
 
 Checkov configuration file:
 - Skip specific checks (with justification)
@@ -49,7 +49,7 @@ Checkov configuration file:
 - Define baseline exceptions
 - Configure output formats
 
-#### [NEW] [.tfsec.yaml](file:///Users/marwanghubein/tech-repo/landing-zones/.tfsec.yaml)
+#### [NEW] [.tfsec.yaml](file:///Users/marwanghubein/tech-repo/AltanovaLLM/.tfsec.yaml)
 
 tfsec configuration file:
 - Custom severity levels
@@ -57,7 +57,7 @@ tfsec configuration file:
 - Define ignore patterns
 - Configure output formats
 
-#### [NEW] [sonar-project.properties](file:///Users/marwanghubein/tech-repo/landing-zones/sonar-project.properties)
+#### [NEW] [sonar-project.properties](file:///Users/marwanghubein/tech-repo/AltanovaLLM/sonar-project.properties)
 
 SonarQube project configuration:
 - Project key and name
@@ -70,7 +70,7 @@ SonarQube project configuration:
 
 ### Documentation Updates
 
-#### [MODIFY] [BOOTCAMP.md](file:///Users/marwanghubein/tech-repo/landing-zones/BOOTCAMP.md)
+#### [MODIFY] [BOOTCAMP.md](file:///Users/marwanghubein/tech-repo/AltanovaLLM/BOOTCAMP.md)
 
 Add section on security scanning:
 - How to interpret scan results

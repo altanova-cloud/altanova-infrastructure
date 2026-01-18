@@ -130,7 +130,7 @@ jobs:
 
     outputs:
       plan_created: ${{ steps.plan.outputs.plan_created }}
-      resources_to_destroy: ${{ steps.plan.outputs.resources_count }}
+      plan_exit_code: ${{ steps.plan.outputs.plan_exit_code }}
 
     steps:
       - name: Checkout code
@@ -184,12 +184,11 @@ jobs:
 
           # Run destroy plan
           terraform plan -destroy $TARGETS -no-color -out=destroy.tfplan 2>&1 | tee destroy_plan_output.txt
+          PLAN_EXIT_CODE=$?
 
-          # Count resources to destroy
-          DESTROY_COUNT=$(grep -c "will be destroyed" destroy_plan_output.txt || echo "0")
-          echo "Resources to destroy: $DESTROY_COUNT"
+          echo "Destroy plan generated successfully"
           echo "plan_created=true" >> $GITHUB_OUTPUT
-          echo "resources_count=$DESTROY_COUNT" >> $GITHUB_OUTPUT
+          echo "plan_exit_code=$PLAN_EXIT_CODE" >> $GITHUB_OUTPUT
 
           echo "::endgroup::"
 
@@ -208,14 +207,15 @@ jobs:
           echo "### 📋 Destroy Plan Output" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Resources targeted:** \`${{ github.event.inputs.resources }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Plan exit code:** ${{ steps.plan.outputs.plan_exit_code }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Extract key information
+          # Extract plan summary
           echo "<details>" >> $GITHUB_STEP_SUMMARY
-          echo "<summary>🔴 Resources to be DESTROYED (click to expand)</summary>" >> $GITHUB_STEP_SUMMARY
+          echo "<summary>🔴 Plan Summary (click to expand)</summary>" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          grep -E "(will be destroyed|Plan:)" destroy_plan_output.txt >> $GITHUB_STEP_SUMMARY || echo "No resources to destroy"
+          tail -50 destroy_plan_output.txt >> $GITHUB_STEP_SUMMARY || echo "Plan output not available"
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "</details>" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -224,7 +224,7 @@ jobs:
           echo "<summary>📄 Full Plan Output (click to expand)</summary>" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`terraform" >> $GITHUB_STEP_SUMMARY
-          head -500 destroy_plan_output.txt >> $GITHUB_STEP_SUMMARY
+          cat destroy_plan_output.txt >> $GITHUB_STEP_SUMMARY || echo "Plan output not available"
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "</details>" >> $GITHUB_STEP_SUMMARY
 
@@ -236,6 +236,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [safety-check, destroy-plan]
     if: |
+      always() &&
       needs.safety-check.outputs.confirmed == 'true' &&
       needs.destroy-plan.outputs.plan_created == 'true' &&
       github.event.inputs.dry_run != 'true'

@@ -2,6 +2,8 @@
 # Uses OIDC authentication (no static credentials)
 # Simplified for quick deployment - no security tools, no approval gates
 #
+# Test trigger: Pipeline should start automatically on push/merge request
+#
 # Prerequisites:
 # 1. GitLab OIDC Provider configured in AWS
 # 2. IAM roles created and trusting OIDC provider

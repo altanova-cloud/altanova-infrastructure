@@ -1,0 +1,261 @@
+# GitLab CI/CD Pipeline for Terraform Infrastructure
+# Uses OIDC authentication (no static credentials)
+# Simplified for quick deployment - no security tools, no approval gates
+#
+# Prerequisites:
+# 1. Create GitLab OIDC Provider in AWS
+# 2. Create IAM roles that trust the OIDC provider
+# 3. Set GitLab CI/CD variables:
+#    - OIDC_PROVIDER_ARN: ARN of OIDC provider
+#    - AWS_ROLE_ARN_SHARED: Role to assume for shared account
+#    - AWS_ROLE_ARN_DEV: Role to assume for dev account
+#    - AWS_ROLE_ARN_PROD: Role to assume for prod account
+
+stages:
+  - validate
+  - plan
+  - apply
+  - destroy
+
+variables:
+  AWS_REGION: "us-east-1"
+  TF_VERSION: "1.8"
+
+# Assume AWS role using GitLab OIDC token
+.assume_role:
+  image: amazon/aws-cli:latest
+  before_script:
+    # Request JWT token from GitLab
+    - export GITLAB_JWT=$CI_JOB_JWT
+    - echo "Using OIDC token from GitLab (${CI_SERVER_HOST})"
+
+    # Assume AWS role using OIDC token
+    - |
+      CREDENTIALS=$(aws sts assume-role-with-web-identity \
+        --role-arn ${AWS_ROLE_ARN} \
+        --role-session-name "gitlab-ci-${CI_JOB_ID}-${CI_COMMIT_SHORT_SHA}" \
+        --web-identity-token ${GITLAB_JWT} \
+        --duration-seconds 3600 \
+        --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+        --output text)
+
+    # Export AWS credentials
+    - export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | awk '{print $1}')
+    - export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | awk '{print $2}')
+    - export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | awk '{print $3}')
+    - echo "✅ AWS credentials obtained via OIDC"
+
+# Cache for Terraform
+.terraform_cache:
+  cache:
+    key:
+      files:
+        - aws/environments/*/backend.conf
+    paths:
+      - .terraform/
+      - .terraform.d/
+
+# Base template for Terraform jobs
+.terraform_base:
+  image: hashicorp/terraform:${TF_VERSION}
+  extends:
+    - .terraform_cache
+    - .assume_role
+  before_script:
+    - !reference [.assume_role, before_script]
+    - cd ${TF_WORKING_DIR}
+    - terraform init -backend-config=backend.conf
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+
+# ============================================================================
+# SHARED ACCOUNT (State & OIDC)
+# ============================================================================
+
+validate:shared:
+  extends: .terraform_base
+  stage: validate
+  variables:
+    TF_WORKING_DIR: aws/environments/shared-account
+    AWS_ROLE_ARN: ${SHARED_AWS_ROLE_ARN}
+  script:
+    - terraform fmt -check -recursive
+    - terraform init -backend=false
+    - terraform validate
+  only:
+    - master
+    - merge_requests
+
+plan:shared:
+  extends: .terraform_base
+  stage: plan
+  variables:
+    TF_WORKING_DIR: aws/environments/shared-account
+    AWS_ROLE_ARN: ${SHARED_AWS_ROLE_ARN}
+  script:
+    - terraform plan -no-color -out=tfplan | tee plan_output.txt
+  artifacts:
+    paths:
+      - aws/environments/shared-account/tfplan
+      - aws/environments/shared-account/plan_output.txt
+    expire_in: 7 days
+  dependencies:
+    - validate:shared
+  only:
+    - master
+    - merge_requests
+
+apply:shared:
+  extends: .terraform_base
+  stage: apply
+  variables:
+    TF_WORKING_DIR: aws/environments/shared-account
+    AWS_ROLE_ARN: ${SHARED_AWS_ROLE_ARN}
+  script:
+    - terraform apply -auto-approve -no-color tfplan
+  dependencies:
+    - plan:shared
+  only:
+    - master
+  when: on_success
+
+# ============================================================================
+# DEV ACCOUNT
+# ============================================================================
+
+validate:dev:
+  extends: .terraform_base
+  stage: validate
+  variables:
+    TF_WORKING_DIR: aws/environments/dev-app-account
+    AWS_ROLE_ARN: ${DEV_AWS_ROLE_ARN}
+  script:
+    - terraform fmt -check -recursive
+    - terraform init -backend=false
+    - terraform validate
+  only:
+    - master
+    - merge_requests
+
+plan:dev:
+  extends: .terraform_base
+  stage: plan
+  variables:
+    TF_WORKING_DIR: aws/environments/dev-app-account
+    AWS_ROLE_ARN: ${DEV_AWS_ROLE_ARN}
+  script:
+    - terraform plan -no-color -out=tfplan | tee plan_output.txt
+  artifacts:
+    paths:
+      - aws/environments/dev-app-account/tfplan
+      - aws/environments/dev-app-account/plan_output.txt
+    expire_in: 7 days
+  dependencies:
+    - validate:dev
+  only:
+    - master
+    - merge_requests
+
+apply:dev:
+  extends: .terraform_base
+  stage: apply
+  variables:
+    TF_WORKING_DIR: aws/environments/dev-app-account
+    AWS_ROLE_ARN: ${DEV_AWS_ROLE_ARN}
+  script:
+    - terraform apply -auto-approve -no-color tfplan
+  dependencies:
+    - plan:dev
+  only:
+    - master
+  when: on_success
+
+destroy:dev:
+  extends: .terraform_base
+  stage: destroy
+  variables:
+    TF_WORKING_DIR: aws/environments/dev-app-account
+    AWS_ROLE_ARN: ${DEV_AWS_ROLE_ARN}
+  script:
+    - echo "🔴 DESTROYING Dev Account Infrastructure"
+    - terraform plan -destroy -no-color -out=destroy.tfplan | tee destroy_plan.txt
+    - terraform apply -auto-approve -no-color destroy.tfplan
+  artifacts:
+    paths:
+      - aws/environments/dev-app-account/destroy_plan.txt
+    expire_in: 90 days
+  only:
+    - master
+  when: manual
+
+# ============================================================================
+# PROD ACCOUNT
+# ============================================================================
+
+validate:prod:
+  extends: .terraform_base
+  stage: validate
+  variables:
+    TF_WORKING_DIR: aws/environments/prod-app-account
+    AWS_ROLE_ARN: ${PROD_AWS_ROLE_ARN}
+  script:
+    - terraform fmt -check -recursive
+    - terraform init -backend=false
+    - terraform validate
+  only:
+    - master
+    - merge_requests
+
+plan:prod:
+  extends: .terraform_base
+  stage: plan
+  variables:
+    TF_WORKING_DIR: aws/environments/prod-app-account
+    AWS_ROLE_ARN: ${PROD_AWS_ROLE_ARN}
+  script:
+    - terraform plan -no-color -out=tfplan | tee plan_output.txt
+  artifacts:
+    paths:
+      - aws/environments/prod-app-account/tfplan
+      - aws/environments/prod-app-account/plan_output.txt
+    expire_in: 7 days
+  dependencies:
+    - validate:prod
+  only:
+    - master
+    - merge_requests
+
+apply:prod:
+  extends: .terraform_base
+  stage: apply
+  variables:
+    TF_WORKING_DIR: aws/environments/prod-app-account
+    AWS_ROLE_ARN: ${PROD_AWS_ROLE_ARN}
+  script:
+    - terraform apply -auto-approve -no-color tfplan
+  dependencies:
+    - plan:prod
+  only:
+    - master
+  when: on_success
+
+destroy:prod:
+  extends: .terraform_base
+  stage: destroy
+  variables:
+    TF_WORKING_DIR: aws/environments/prod-app-account
+    AWS_ROLE_ARN: ${PROD_AWS_ROLE_ARN}
+  script:
+    - echo "🔴 DESTROYING Prod Account Infrastructure"
+    - terraform plan -destroy -no-color -out=destroy.tfplan | tee destroy_plan.txt
+    - terraform apply -auto-approve -no-color destroy.tfplan
+  artifacts:
+    paths:
+      - aws/environments/prod-app-account/destroy_plan.txt
+    expire_in: 90 days
+  only:
+    - master
+  when: manual

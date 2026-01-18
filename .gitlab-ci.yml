@@ -34,12 +34,19 @@ variables:
 
 # Base template for Terraform jobs
 .terraform_base:
-  image: alpine:latest
+  image: debian:bookworm-slim
   extends:
     - .terraform_cache
   before_script:
-    # Install terraform and aws-cli
-    - apk add --no-cache terraform aws-cli
+    # Update package lists and install dependencies
+    - apt-get update
+    - apt-get install -y --no-install-recommends curl unzip awscli
+
+    # Download and install Terraform
+    - curl -s https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip -o terraform.zip
+    - unzip -q terraform.zip
+    - mv terraform /usr/local/bin/
+    - rm terraform.zip
 
     # Get OIDC token and assume AWS role
     - export GITLAB_JWT=$CI_JOB_JWT

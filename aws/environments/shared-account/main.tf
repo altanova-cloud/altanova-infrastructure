@@ -70,6 +70,7 @@ resource "aws_iam_openid_connect_provider" "gitlab" {
 }
 
 # GitLab Runner Role (for GitLab CI/CD)
+# Trusts GitLab OIDC tokens with audience "sts.amazonaws.com" (standard for AWS STS)
 resource "aws_iam_role" "gitlab_runner" {
   name = "GitLabRunnerRole"
 
@@ -83,7 +84,7 @@ resource "aws_iam_role" "gitlab_runner" {
       Action = "sts:AssumeRoleWithWebIdentity"
       Condition = {
         StringEquals = {
-          "gitlab.com:aud" = "https://gitlab.com"
+          "gitlab.com:aud" = "sts.amazonaws.com"
         }
       }
     }]

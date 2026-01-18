@@ -6,6 +6,7 @@
 # 1. Configure GitLab as OIDC provider in AWS:
 #    - Create OIDC Identity Provider with URL: https://gitlab.com
 #    - Thumbprint obtained from GitLab OIDC config endpoint
+#    - Token audience: sts.amazonaws.com (for AWS STS operations)
 #
 # 2. Create IAM roles with trust policy for GitLab:
 #    - AWS_ROLE_ARN: GitLabRunnerRole (Shared account)
@@ -48,7 +49,7 @@ variables:
   extends: .terraform_cache
   id_tokens:
     GITLAB_OIDC_TOKEN:
-      aud: https://gitlab.com
+      aud: sts.amazonaws.com
   before_script:
     - |
       echo "Assuming AWS role using GitLab OIDC token..."

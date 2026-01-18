@@ -56,6 +56,67 @@ resource "aws_iam_role_policy" "cross_account_assume" {
   })
 }
 
+# GitLab OIDC Identity Provider
+resource "aws_iam_openid_connect_provider" "gitlab" {
+  url             = "https://gitlab.com"
+  client_id_list  = ["https://gitlab.com"]
+  thumbprint_list = ["2b8f1b57330dbba2d07a6c51f70ee90ddab9ad8e"]
+
+  tags = {
+    Environment = "shared"
+    ManagedBy   = "Terraform"
+    Purpose     = "GitLab CI/CD OIDC"
+  }
+}
+
+# GitLab Runner Role (for GitLab CI/CD)
+resource "aws_iam_role" "gitlab_runner" {
+  name = "GitLabRunnerRole"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.gitlab.arn
+      }
+      Action = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "gitlab.com:aud" = "https://gitlab.com"
+        }
+      }
+    }]
+  })
+
+  tags = {
+    Environment = "shared"
+    ManagedBy   = "Terraform"
+    Purpose     = "GitLab CI/CD"
+  }
+}
+
+# Policy to allow GitLabRunnerRole to assume Dev/Prod deploy roles
+resource "aws_iam_role_policy" "gitlab_cross_account_assume" {
+  name = "GitLabCrossAccountAssume"
+  role = aws_iam_role.gitlab_runner.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "sts:AssumeRole",
+        "sts:TagSession"
+      ]
+      Resource = [
+        "arn:aws:iam::${var.dev_account_id}:role/DevDeployRole",
+        "arn:aws:iam::${var.prod_account_id}:role/ProdDeployRole"
+      ]
+    }]
+  })
+}
+
 output "state_bucket_arn" {
   value = module.bootstrap.s3_bucket_arn
 }
@@ -76,4 +137,19 @@ output "github_actions_role_arn" {
 output "github_actions_role_name" {
   description = "Name of the GitHub Actions IAM role"
   value       = module.github_oidc.role_name
+}
+
+output "gitlab_oidc_provider_arn" {
+  description = "ARN of the GitLab OIDC provider"
+  value       = aws_iam_openid_connect_provider.gitlab.arn
+}
+
+output "gitlab_runner_role_arn" {
+  description = "ARN of the GitLab Runner IAM role"
+  value       = aws_iam_role.gitlab_runner.arn
+}
+
+output "gitlab_runner_role_name" {
+  description = "Name of the GitLab Runner IAM role"
+  value       = aws_iam_role.gitlab_runner.name
 }

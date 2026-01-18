@@ -3,23 +3,30 @@
 
 ---
 
-## 🏢 Your Current AWS Organization Structure
+## 📊 Current Deployment Status
+
+> **Last Updated:** January 2026
+>
+> This document reflects the **actual deployed state** of the infrastructure.
+> Items marked with ✅ are deployed, ➕ are planned, and ❌ are not recommended.
+
+---
+
+## 🏢 AWS Organization Structure
 
 ```
 AWS Organization (Root)
 ├── Management Account (Org root)
-├── Shared Services Account (SharedOU)
-├── Dev Account (Development workloads)
-└── Prod Account (Production workloads)
+├── Shared Services Account (265245191272) ─── eu-west-1/us-east-1
+├── Dev Account ─────────────────────────────── eu-west-1
+└── Prod Account ────────────────────────────── eu-west-1
 ```
 
 ---
 
-## 🎯 Recommended Architecture: Where to Deploy VPC & EKS
+## 🎯 Architecture Overview
 
-### **RECOMMENDATION: Deploy Separate VPCs in Dev and Prod Accounts**
-
-#### ✅ **Best Practice Architecture:**
+### **Separate VPCs in Dev and Prod Accounts (AWS Best Practice)**
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -40,16 +47,16 @@ AWS Organization (Root)
 │ Shared        │    │ Dev Account   │    │ Prod Account  │
 │ Services      │    │               │    │               │
 │ Account       │    │ ┌───────────┐ │    │ ┌───────────┐ │
-│               │    │ │ VPC       │ │    │ │ VPC       │ │
-│ - GitLab OIDC │    │ │ Dev EKS   │ │    │ │ Prod EKS  │ │
-│ - TF State    │    │ │ Cluster   │ │    │ │ Cluster   │ │
-│ - ECR         │◄───┼─┤           │ │    │ │           │ │
-│ - Secrets Mgr │    │ │ Dev Apps  │ │    │ │ Prod Apps │ │
-│ - Route53     │    │ └───────────┘ │    │ └───────────┘ │
-│ - Transit GW  │    │               │    │               │
-│   (optional)  │    │ - Dev RDS     │    │ - Prod RDS    │
-│               │    │ - Dev Redis   │    │ - Prod Redis  │
-└───────────────┘    │ - Dev S3      │    │ - Prod S3     │
+│               │    │ │ VPC  ✅   │ │    │ │ VPC  ✅   │ │
+│ ✅ GitHub OIDC│    │ │ EKS  ✅   │ │    │ │ EKS  ➕   │ │
+│ ✅ TF State   │    │ │ Cluster   │ │    │ │ Cluster   │ │
+│ ✅ ECR        │◄───┼─┤           │ │    │ │           │ │
+│ ➕ Secrets Mgr│    │ │ Dev Apps  │ │    │ │ Prod Apps │ │
+│ ✅ Route53    │    │ └───────────┘ │    │ └───────────┘ │
+│ ➕ Transit GW │    │               │    │               │
+│   (optional)  │    │ ✅ Dev RDS    │    │ ➕ Prod RDS   │
+│               │    │ ➕ Dev Redis  │    │ ➕ Prod Redis │
+└───────────────┘    │ ➕ Dev S3     │    │ ➕ Prod S3    │
                      └───────────────┘    └───────────────┘
 ```
 
@@ -82,34 +89,45 @@ AWS Organization (Root)
 
 **Purpose:** Centralized services used by all accounts
 
-**What to deploy:**
+**Current Deployment Status:**
 ```
-Shared Services Account
-├── Networking (Optional)
-│   └── Transit Gateway (for cross-account connectivity)
-│
-├── Container Registry
-│   └── Amazon ECR (shared Docker images)
+Shared Services Account (265245191272)
 │
 ├── CI/CD Infrastructure
-│   ├── GitLab OIDC Provider (already deployed)
-│   └── Terraform State (S3 + DynamoDB) (already deployed)
+│   ├── ✅ GitHub OIDC Provider
+│   │   └── GitHubActionsRole (OIDC authentication)
+│   ├── ✅ Terraform State Backend
+│   │   ├── S3 Bucket: altanova-tf-state-eu-central-1
+│   │   └── DynamoDB Table: altanova-terraform-locks
+│   └── ✅ Cross-Account Access
+│       └── TerraformStateAccessRole
+│
+├── Container Registry
+│   └── ✅ Amazon ECR
+│       ├── altanova/control-plane
+│       ├── altanova/inference-service
+│       ├── altanova/tenant-console
+│       └── altanova/audit-logger
+│
+├── Networking (Optional)
+│   └── ➕ Transit Gateway (planned)
 │
 ├── DNS
-│   └── Route53 Hosted Zones (company.com)
+│   └── ✅ Route53 Hosted Zone
+│       └── altanova.cloud (external NS at one.com)
 │
 ├── Secrets Management
-│   ├── AWS Secrets Manager (cross-account access)
-│   └── Parameter Store
+│   ├── ➕ AWS Secrets Manager (cross-account, planned)
+│   └── ➕ Parameter Store (planned)
 │
 ├── Security Services
-│   ├── AWS Security Hub (aggregator)
-│   ├── GuardDuty (delegated admin)
-│   └── AWS Config (rules)
+│   ├── ➕ AWS Security Hub (planned)
+│   ├── ➕ GuardDuty (planned)
+│   └── ➕ AWS Config (planned)
 │
 └── Monitoring (Optional)
-    ├── CloudWatch (cross-account dashboards)
-    └── Grafana/Prometheus (centralized)
+    ├── ➕ CloudWatch (planned)
+    └── ➕ Grafana/Prometheus (planned)
 ```
 
 **What NOT to deploy:**
@@ -125,38 +143,60 @@ Shared Services Account
 
 **Purpose:** Development and testing environment
 
-**What to deploy:**
+**Current Deployment Status:**
 ```
-Dev Account
-├── VPC (10.0.0.0/16)
-│   ├── Public Subnets (10.0.1.0/24, 10.0.2.0/24)
-│   ├── Private Subnets (10.0.10.0/24, 10.0.11.0/24)
-│   ├── Database Subnets (10.0.20.0/24, 10.0.21.0/24)
-│   ├── Internet Gateway
-│   └── NAT Gateway (1 for cost savings)
+Dev Account (eu-west-1)
 │
-├── EKS Cluster (Dev)
-│   ├── Cluster Name: technosol-dev
-│   ├── Version: 1.32
-│   ├── Node Groups: 2-4 nodes (smaller instances)
-│   └── Add-ons: LB Controller, Autoscaler, etc.
+├── ✅ VPC: altanova-dev-euw1-vpc (10.0.0.0/16)
+│   ├── ✅ Public Subnets (2 AZs)
+│   │   ├── altanova-dev-euw1-public-a (10.0.1.0/24) - eu-west-1a
+│   │   └── altanova-dev-euw1-public-b (10.0.2.0/24) - eu-west-1b
+│   ├── ✅ Private Subnets (2 AZs) - EKS-ready tags
+│   │   ├── altanova-dev-euw1-private-a (10.0.10.0/24) - eu-west-1a
+│   │   └── altanova-dev-euw1-private-b (10.0.11.0/24) - eu-west-1b
+│   ├── ✅ Database Subnets (2 AZs)
+│   │   ├── altanova-dev-euw1-database-a (10.0.20.0/24) - eu-west-1a
+│   │   └── altanova-dev-euw1-database-b (10.0.21.0/24) - eu-west-1b
+│   ├── ✅ Internet Gateway: altanova-dev-euw1-igw
+│   ├── ✅ NAT Gateway: altanova-dev-euw1-nat (single, cost-optimized)
+│   └── ✅ VPC Flow Logs (CloudWatch)
 │
-├── Data Layer
-│   ├── RDS (Dev) - smaller instances
-│   ├── ElastiCache (Dev)
-│   └── S3 Buckets (dev-*)
+├── ✅ IAM
+│   └── DevDeployRole (GitHub Actions cross-account access)
 │
-└── Microservices
-    ├── Service A (dev)
-    ├── Service B (dev)
-    └── Service C (dev)
+├── ✅ RDS PostgreSQL: altanova-dev-euw1-postgres
+│   ├── Engine: PostgreSQL 18.1
+│   ├── Instance: db.t3.micro (Free Tier)
+│   ├── Storage: 20GB gp3 (encrypted)
+│   ├── Single-AZ (cost-optimized)
+│   ├── Performance Insights: enabled (7 days)
+│   └── Credentials: AWS Secrets Manager
+│
+├── ✅ EKS Cluster: altanova-dev-euw1-eks
+│   ├── Version: 1.31
+│   ├── System Nodes: 2x t3.small (managed, on-demand)
+│   │   ├── Taint: CriticalAddonsOnly=true:NoSchedule
+│   │   └── Runs: Karpenter, CoreDNS, system add-ons
+│   ├── Application Nodes: Karpenter-managed (SPOT + on-demand)
+│   │   ├── General NodePool: t3/m5/c5 (small-large), SPOT priority
+│   │   └── Critical NodePool: t3/m5 (small-medium), on-demand only
+│   ├── Add-ons: CoreDNS, kube-proxy, VPC-CNI, Pod Identity Agent
+│   └── IRSA: Enabled for service account IAM integration
+│
+├── ✅ ACM Certificate: *.dev.altanova.cloud
+│   └── DNS Validation via Route53 (shared account)
+│
+├── ➕ ElastiCache (planned)
+│
+└── ➕ Application S3 Buckets (planned)
 ```
 
 **Configuration:**
-- Lower-cost instances
-- Single NAT Gateway
-- Relaxed security for testing
-- Auto-shutdown during off-hours
+- ✅ Single NAT Gateway (cost optimization)
+- ✅ VPC Flow Logs enabled
+- ✅ Database in isolated subnets
+- ✅ EKS-ready subnet tagging
+- ➕ Auto-shutdown during off-hours (planned)
 
 ---
 
@@ -164,40 +204,55 @@ Dev Account
 
 **Purpose:** Production workloads
 
-**What to deploy:**
+**Current Deployment Status:**
 ```
-Prod Account
-├── VPC (10.1.0.0/16)
-│   ├── Public Subnets (10.1.1.0/24, 10.1.2.0/24, 10.1.3.0/24)
-│   ├── Private Subnets (10.1.10.0/24, 10.1.11.0/24, 10.1.12.0/24)
-│   ├── Database Subnets (10.1.20.0/24, 10.1.21.0/24, 10.1.22.0/24)
-│   ├── Internet Gateway
-│   └── NAT Gateways (3 - one per AZ for HA)
+Prod Account (eu-west-1)
 │
-├── EKS Cluster (Prod)
-│   ├── Cluster Name: technosol-prod
+├── ✅ VPC: altanova-prod-euw1-vpc (10.1.0.0/16)
+│   ├── ✅ Public Subnets (3 AZs)
+│   │   ├── altanova-prod-euw1-public-a (10.1.1.0/24) - eu-west-1a
+│   │   ├── altanova-prod-euw1-public-b (10.1.2.0/24) - eu-west-1b
+│   │   └── altanova-prod-euw1-public-c (10.1.3.0/24) - eu-west-1c
+│   ├── ✅ Private Subnets (3 AZs) - EKS-ready tags
+│   │   ├── altanova-prod-euw1-private-a (10.1.10.0/24) - eu-west-1a
+│   │   ├── altanova-prod-euw1-private-b (10.1.11.0/24) - eu-west-1b
+│   │   └── altanova-prod-euw1-private-c (10.1.12.0/24) - eu-west-1c
+│   ├── ✅ Database Subnets (3 AZs)
+│   │   ├── altanova-prod-euw1-database-a (10.1.20.0/24) - eu-west-1a
+│   │   ├── altanova-prod-euw1-database-b (10.1.21.0/24) - eu-west-1b
+│   │   └── altanova-prod-euw1-database-c (10.1.22.0/24) - eu-west-1c
+│   ├── ✅ Internet Gateway: altanova-prod-euw1-igw
+│   ├── ✅ NAT Gateway: altanova-prod-euw1-nat (single, upgrade to 3 for HA)
+│   ├── ✅ VPC Flow Logs (CloudWatch)
+│   └── ✅ Default Security Group (locked down - no ingress/egress)
+│
+├── ✅ IAM
+│   └── ProdDeployRole (GitHub Actions cross-account access)
+│
+├── ➕ RDS PostgreSQL (planned)
+│   ├── Multi-AZ deployment
+│   ├── Production instance class
+│   └── Automated backups
+│
+├── ➕ EKS Cluster (planned)
+│   ├── Cluster Name: altanova-prod-euw1-eks
 │   ├── Version: 1.32
 │   ├── Node Groups: 6-20 nodes (production-grade)
-│   ├── Multi-AZ deployment
-│   └── Add-ons: Full observability stack
+│   └── Multi-AZ deployment
 │
-├── Data Layer (HA)
-│   ├── RDS Multi-AZ
-│   ├── ElastiCache Multi-AZ
-│   └── S3 Buckets (prod-*, versioned)
+├── ➕ ElastiCache Multi-AZ (planned)
 │
-└── Microservices
-    ├── Service A (prod) - Multi-AZ
-    ├── Service B (prod) - Multi-AZ
-    └── Service C (prod) - Multi-AZ
+└── ➕ Application S3 Buckets (planned, versioned)
 ```
 
 **Configuration:**
-- Production-grade instances
-- Multi-AZ NAT Gateways
-- Strict security policies
-- Enhanced monitoring
-- Automated backups
+- ✅ 3 Availability Zones (HA-ready)
+- ✅ VPC Flow Logs enabled
+- ✅ Default Security Group locked down
+- ✅ EKS-ready subnet tagging
+- ⚠️ Single NAT Gateway (upgrade to 3 for production HA)
+- ➕ Multi-AZ NAT Gateways (planned)
+- ➕ Enhanced monitoring (planned)
 
 ---
 
@@ -264,17 +319,27 @@ Internet
 [RDS in Database Subnet] ← Isolated
 ```
 
-### Cross-Account Access
+### Cross-Account Access ✅ DEPLOYED
 
 ```
-Dev/Prod Accounts
+GitHub Actions (OIDC)
     ↓
-[IAM Role Assumption] ← DevDeployRole / ProdDeployRole
+[GitHubActionsRole] ← Shared Account (OIDC trust)
     ↓
-Shared Services Account
-    ↓
-[ECR, Secrets Manager, Route53]
+    ├── Direct: Terraform State (S3 + DynamoDB)
+    │
+    └── Cross-Account Assume Role
+        ├── [DevDeployRole] ← Dev Account
+        │       └── Assumes: TerraformStateAccessRole
+        │
+        └── [ProdDeployRole] ← Prod Account
+                └── Assumes: TerraformStateAccessRole
 ```
+
+**IAM Role Chain:**
+1. GitHub Actions authenticates via OIDC → `GitHubActionsRole` (Shared)
+2. `GitHubActionsRole` assumes `DevDeployRole` or `ProdDeployRole` (App Accounts)
+3. Deploy roles assume `TerraformStateAccessRole` (Shared) for state access
 
 ---
 
@@ -325,125 +390,164 @@ RDS / ElastiCache (Database Subnet)
 
 ## 🚀 Implementation Roadmap
 
-### Phase 1: Foundation (Week 1-2)
+### Phase 1: Foundation ✅ COMPLETE
 **Shared Services Account:**
-- ✅ Already have: OIDC, Terraform State
-- ➕ Add: ECR repositories
-- ➕ Add: Route53 hosted zone
-- ➕ Add: Secrets Manager
+- ✅ GitHub OIDC Provider + GitHubActionsRole
+- ✅ Terraform State Backend (S3 + DynamoDB)
+- ✅ Cross-Account Access Role (TerraformStateAccessRole)
 
 **Dev Account:**
-- ➕ Deploy VPC with EKS Blueprints
-- ➕ Deploy EKS cluster
-- ➕ Configure cross-account access to Shared Services
+- ✅ VPC with 3-tier subnet architecture
+- ✅ DevDeployRole for CI/CD
+- ✅ RDS PostgreSQL (dev instance)
 
-### Phase 2: Development Environment (Week 3-4)
+**Prod Account:**
+- ✅ VPC with 3-tier subnet architecture (3 AZs)
+- ✅ ProdDeployRole for CI/CD
+- ✅ Hardened default security group
+
+### Phase 2: Shared Services Enhancement ✅ COMPLETE
+**Shared Services Account:**
+- ✅ ECR repositories (control-plane, inference-service, tenant-console, audit-logger)
+- ✅ Route53 hosted zone (altanova.cloud)
+- ➕ Centralized Secrets Manager (planned)
+
+### Phase 3: EKS Clusters ✅ IN PROGRESS
 **Dev Account:**
-- ➕ Deploy microservices (dev versions)
-- ➕ Set up CI/CD pipeline
-- ➕ Configure monitoring
-- ➕ Test end-to-end
+- ✅ EKS cluster deployed (altanova-dev-euw1-eks v1.31)
+- ✅ Karpenter for auto-scaling (replaces Cluster Autoscaler)
+- ✅ System node group (2x t3.small, on-demand)
+- ✅ Application NodePools (general + critical)
+- ✅ AWS Load Balancer Controller
+- ✅ ACM Certificate (*.dev.altanova.cloud)
+- ➕ ElastiCache for session/cache
 
-### Phase 3: Production Environment (Week 5-6)
 **Prod Account:**
-- ➕ Deploy VPC with EKS Blueprints
-- ➕ Deploy EKS cluster (HA configuration)
-- ➕ Deploy production databases
-- ➕ Configure enhanced security
+- ➕ Deploy EKS cluster (altanova-prod-euw1-eks)
+- ➕ Upgrade NAT Gateway to Multi-AZ (3 gateways)
+- ➕ RDS PostgreSQL Multi-AZ
+- ➕ ElastiCache Multi-AZ
 
-### Phase 4: Production Deployment (Week 7-8)
-**Prod Account:**
-- ➕ Deploy microservices (prod versions)
-- ➕ Configure auto-scaling
+### Phase 4: Application Deployment ➕ PLANNED
+**Both Accounts:**
+- ➕ Deploy microservices
+- ➕ Configure monitoring (CloudWatch, Prometheus)
 - ➕ Set up disaster recovery
-- ➕ Go live!
+- ➕ Production go-live
 
 ---
 
-## 📁 Recommended Directory Structure
+## 📁 Current Directory Structure
 
 ```
-tech-repo/
-├── landing-zones/                    # Account setup
-│   └── aws/environments/
-│       ├── shared-account/           # OIDC, State, ECR
-│       ├── dev-app-account/          # Dev IAM roles
-│       └── prod-app-account/         # Prod IAM roles
+AltanovaLLM/
+├── aws/
+│   ├── modules/                      # Reusable Terraform modules
+│   │   ├── bootstrap/                # ✅ S3 state bucket + DynamoDB locks
+│   │   ├── github-oidc/              # ✅ GitHub Actions OIDC role
+│   │   └── deployment-role/          # ✅ Cross-account deploy roles
+│   │
+│   └── environments/
+│       ├── shared-account/           # ✅ Shared Services Account
+│       │   ├── main.tf               # Bootstrap + GitHub OIDC modules
+│       │   ├── ecr.tf                # ✅ ECR repositories for platform services
+│       │   ├── route53.tf            # ✅ Route53 hosted zone + cross-account policy
+│       │   ├── variables.tf          # Account IDs, GitHub config, domain
+│       │   ├── backend.tf            # Remote state config
+│       │   └── backend.conf          # Backend credentials
+│       │
+│       ├── dev-app-account/          # ✅ Dev Account
+│       │   ├── main.tf               # VPC module (terraform-aws-modules)
+│       │   ├── iam.tf                # DevDeployRole
+│       │   ├── rds.tf                # ✅ PostgreSQL + Secrets Manager
+│       │   ├── eks.tf                # ✅ EKS cluster + system nodes + Karpenter IAM
+│       │   ├── karpenter.tf          # ✅ Karpenter Helm + NodePool/EC2NodeClass
+│       │   ├── alb-controller.tf     # ✅ AWS Load Balancer Controller
+│       │   ├── acm.tf                # ✅ ACM certificate (*.dev.altanova.cloud)
+│       │   ├── variables.tf          # Cross-account role ARNs, domain config
+│       │   ├── outputs.tf            # VPC, RDS, EKS, ACM outputs
+│       │   ├── providers.tf          # AWS + Kubernetes + Helm + Kubectl providers
+│       │   ├── backend.tf            # Remote state config
+│       │   └── backend.conf          # Backend credentials
+│       │
+│       └── prod-app-account/         # ✅ Prod Account
+│           ├── main.tf               # VPC module (terraform-aws-modules)
+│           ├── iam.tf                # ProdDeployRole
+│           ├── variables.tf          # Cross-account role ARNs
+│           ├── outputs.tf            # VPC outputs
+│           ├── providers.tf          # AWS provider config
+│           ├── backend.tf            # Remote state config
+│           └── backend.conf          # Backend credentials
 │
-└── infrastructure/                   # Application infrastructure
-    ├── modules/
-    │   ├── vpc/                      # Reusable VPC module
-    │   ├── eks-blueprints/           # EKS wrapper module
-    │   └── microservices/            # App deployment module
-    │
-    ├── shared-services/
-    │   ├── ecr/                      # Container registry
-    │   ├── route53/                  # DNS
-    │   └── secrets/                  # Secrets management
-    │
-    ├── environments/
-    │   ├── dev/
-    │   │   ├── vpc.tf                # Dev VPC
-    │   │   ├── eks.tf                # Dev EKS (Blueprints)
-    │   │   ├── rds.tf                # Dev databases
-    │   │   ├── backend.tf            # Remote state
-    │   │   └── terraform.tfvars      # Dev config
-    │   │
-    │   └── prod/
-    │       ├── vpc.tf                # Prod VPC
-    │       ├── eks.tf                # Prod EKS (Blueprints)
-    │       ├── rds.tf                # Prod databases (HA)
-    │       ├── backend.tf            # Remote state
-    │       └── terraform.tfvars      # Prod config
-    │
-    └── .gitlab-ci.yml                # Infrastructure pipeline
+├── docs/
+│   ├── ARCHITECTURE.md               # This file
+│   └── PIPELINE.md                   # CI/CD pipeline documentation
+│
+├── .github/
+│   └── workflows/
+│       └── terraform-shared.yml      # ✅ GitHub Actions CI/CD
+│
+└── CLAUDE.md                         # Claude Code instructions
 ```
 
 ---
 
-## ✅ Final Recommendations
+## ✅ Current State Summary
 
-### **For Your Microservices Platform:**
+### **What's Deployed:**
 
-1. **✅ Deploy VPC + EKS in BOTH Dev and Prod Accounts**
+| Component | Shared | Dev | Prod |
+|-----------|--------|-----|------|
+| Terraform State (S3/DynamoDB) | ✅ | - | - |
+| GitHub OIDC | ✅ | - | - |
+| Cross-Account Roles | ✅ | ✅ | ✅ |
+| VPC (3-tier) | - | ✅ | ✅ |
+| NAT Gateway | - | ✅ (1) | ✅ (1) |
+| VPC Flow Logs | - | ✅ | ✅ |
+| RDS PostgreSQL | - | ✅ | ➕ |
+| EKS Cluster | - | ✅ | ➕ |
+| ECR | ✅ | - | - |
+| Route53 | ✅ | - | - |
+| ACM Certificate | - | ✅ | ➕ |
+
+### **Architecture Decisions Applied:**
+
+1. **✅ Separate VPCs in Dev and Prod Accounts**
    - Complete environment isolation
    - Independent scaling
    - Blast radius containment
 
-2. **✅ Use Shared Services Account for:**
-   - ECR (container images)
-   - Route53 (DNS)
-   - Secrets Manager
-   - Terraform State (already done)
+2. **✅ Shared Services Account for:**
+   - Terraform State (deployed)
+   - GitHub OIDC authentication (deployed)
+   - ECR, Route53, Secrets Manager (planned)
 
-3. **✅ Use EKS Blueprints**
-   - Production-ready patterns
-   - Best practices built-in
-   - Easy multi-environment deployment
-
-4. **✅ Network Design:**
-   - Dev: 10.0.0.0/16 (1 NAT GW for cost)
-   - Prod: 10.1.0.0/16 (3 NAT GWs for HA)
+3. **✅ Network Design:**
+   - Dev: 10.0.0.0/16, 2 AZs, 1 NAT GW (cost-optimized)
+   - Prod: 10.1.0.0/16, 3 AZs, 1 NAT GW (upgrade to 3 for HA)
    - 3-tier subnet design (Public, Private, Database)
 
-5. **✅ Security:**
+4. **✅ Security:**
    - No workloads in Management Account
-   - Cross-account IAM roles (already configured)
-   - Network isolation per environment
-   - Service mesh for microservices
+   - Cross-account IAM roles configured
+   - Prod default security group locked down
+   - VPC Flow Logs enabled in all VPCs
 
 ---
 
 ## 🎯 Next Steps
 
-1. **Review and approve this architecture**
-2. **Start with Dev environment:**
-   - Deploy VPC in Dev Account
-   - Deploy EKS with Blueprints
-   - Test with one microservice
+### Immediate:
+1. **Configure NS records at one.com** - Point to AWS Route53 name servers
+2. **Set route53_zone_id in dev-app-account** - After shared account deploy
+3. **Deploy Prod RDS** - PostgreSQL Multi-AZ
 
-3. **Once Dev is stable:**
-   - Replicate to Prod Account
-   - Deploy production workloads
+### Short-term (Phase 3 continuation):
+4. **Deploy ArgoCD** - GitOps controller for continuous deployment
+5. **Upgrade Prod NAT to Multi-AZ** - 3 NAT gateways for HA
+6. **Deploy EKS in Prod** - Production-grade cluster
 
-**Ready to start?** I can help you build the Dev environment first!
+### Medium-term (Phase 4):
+7. **Deploy microservices** - Application workloads
+8. **Configure monitoring** - CloudWatch, Prometheus, Grafana
+9. **Go live!**

@@ -11,7 +11,7 @@ This guide details the **one-time manual steps** required to initialize your AWS
 ## Step 1: Configure Variables
 Navigate to the shared account directory:
 ```bash
-cd landing-zones/aws/environments/shared-account
+cd AltanovaLLM/aws/environments/shared-account
 ```
 
 Create a `terraform.tfvars` file with your specific values:
@@ -85,7 +85,7 @@ These resources are now ready for use by your environments.
 ## Step 4: Enable Remote State (Important!)
 Now that the S3 bucket exists, you must configure Terraform to use it.
 
-1.  Create a `backend.tf` file in `landing-zones/aws/environments/shared-account/`:
+1.  Create a `backend.tf` file in `AltanovaLLM/aws/environments/shared-account/`:
     ```hcl
     terraform {
       backend "s3" {

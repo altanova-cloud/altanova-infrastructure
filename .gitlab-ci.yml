@@ -40,7 +40,7 @@ variables:
   before_script:
     # Update package lists and install dependencies
     - apt-get update
-    - apt-get install -y --no-install-recommends curl unzip awscli
+    - apt-get install -y --no-install-recommends curl unzip awscli ca-certificates
 
     # Download and install Terraform
     - echo "Installing Terraform ${TF_VERSION}..."

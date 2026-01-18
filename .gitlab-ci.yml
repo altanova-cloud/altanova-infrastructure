@@ -67,18 +67,37 @@ variables:
   extends: .terraform_cache
   before_script:
     - |
-      GITLAB_TOKEN=${CI_JOB_JWT}
-      echo "Using OIDC token from GitLab"
+      # Debug: Check available variables
+      echo "DEBUG: CI_JOB_JWT = ${CI_JOB_JWT}"
+      echo "DEBUG: CI_JOB_JWT_V2 = ${CI_JOB_JWT_V2}"
+
+      # Install aws-cli if not present
       if ! command -v aws &> /dev/null; then
+        echo "Installing aws-cli..."
         apk add --no-cache aws-cli
       fi
+
+      # Try to get OIDC token
+      GITLAB_TOKEN=${CI_JOB_JWT}
+
+      if [ -z "$GITLAB_TOKEN" ]; then
+        echo "ERROR: CI_JOB_JWT is empty!"
+        echo "Available JWT variables:"
+        env | grep -i jwt || echo "No JWT variables found"
+        exit 1
+      fi
+
+      echo "Using OIDC token from GitLab"
+
+      # Assume AWS role using OIDC token
       CREDENTIALS=$(aws sts assume-role-with-web-identity \
-        --role-arn ${AWS_ROLE_ARN} \
+        --role-arn "${AWS_ROLE_ARN}" \
         --role-session-name "gitlab-ci-${CI_JOB_ID}-${CI_COMMIT_SHORT_SHA}" \
-        --web-identity-token ${GITLAB_TOKEN} \
+        --web-identity-token "${GITLAB_TOKEN}" \
         --duration-seconds 3600 \
         --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
         --output text)
+
       export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | awk '{print $1}')
       export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | awk '{print $2}')
       export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | awk '{print $3}')

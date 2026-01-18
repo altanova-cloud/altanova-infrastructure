@@ -20,7 +20,7 @@ stages:
 
 variables:
   AWS_REGION: "us-east-1"
-  TF_VERSION: "1.8.7"
+  TF_VERSION: "1.8"
 
 # Cache for Terraform
 .terraform_cache:
@@ -32,45 +32,39 @@ variables:
       - .terraform/
       - .terraform.d/
 
-# Base template for Terraform jobs
-.terraform_base:
-  image: debian:bookworm-slim
-  extends:
-    - .terraform_cache
-  before_script:
-    # Update package lists and install dependencies
-    - apt-get update
-    - apt-get install -y --no-install-recommends curl unzip awscli ca-certificates
+# OIDC Authentication script (reusable)
+.assume_role_script: &assume_role_script
+  - |
+    # Get GitLab OIDC token
+    GITLAB_TOKEN=${CI_JOB_JWT}
+    echo "Using OIDC token from GitLab"
 
-    # Download and install Terraform
-    - echo "Installing Terraform ${TF_VERSION}..."
-    - curl -fSL https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip -o terraform.zip
-    - unzip -q terraform.zip
-    - mv terraform /usr/local/bin/
-    - rm terraform.zip
-    - terraform version
-
-    # Get OIDC token and assume AWS role
-    - export GITLAB_JWT=$CI_JOB_JWT
-    - echo "Using OIDC token from GitLab (${CI_SERVER_HOST})"
+    # Install aws-cli if not present
+    if ! command -v aws &> /dev/null; then
+      apk add --no-cache aws-cli
+    fi
 
     # Assume AWS role using OIDC token
-    - |
-      CREDENTIALS=$(aws sts assume-role-with-web-identity \
-        --role-arn ${AWS_ROLE_ARN} \
-        --role-session-name "gitlab-ci-${CI_JOB_ID}-${CI_COMMIT_SHORT_SHA}" \
-        --web-identity-token ${GITLAB_JWT} \
-        --duration-seconds 3600 \
-        --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
-        --output text)
+    CREDENTIALS=$(aws sts assume-role-with-web-identity \
+      --role-arn ${AWS_ROLE_ARN} \
+      --role-session-name "gitlab-ci-${CI_JOB_ID}-${CI_COMMIT_SHORT_SHA}" \
+      --web-identity-token ${GITLAB_TOKEN} \
+      --duration-seconds 3600 \
+      --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+      --output text)
 
     # Export AWS credentials
-    - export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | awk '{print $1}')
-    - export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | awk '{print $2}')
-    - export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | awk '{print $3}')
-    - echo "✅ AWS credentials obtained via OIDC"
+    export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | awk '{print $1}')
+    export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | awk '{print $2}')
+    export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | awk '{print $3}')
+    echo "✅ AWS credentials obtained via OIDC"
 
-    # Initialize Terraform
+# Base template for Terraform jobs
+.terraform_base:
+  image: hashicorp/terraform:${TF_VERSION}
+  extends: .terraform_cache
+  before_script:
+    - *assume_role_script
     - cd ${TF_WORKING_DIR}
     - terraform init -backend-config=backend.conf
   retry:
@@ -91,7 +85,6 @@ validate:shared:
     AWS_ROLE_ARN: $AWS_ROLE_ARN
   script:
     - terraform fmt -check -recursive
-    - terraform init -backend=false
     - terraform validate
   only:
     - master
@@ -142,7 +135,6 @@ validate:dev:
     AWS_ROLE_ARN: $DEV_DEPLOY_ROLE_ARN
   script:
     - terraform fmt -check -recursive
-    - terraform init -backend=false
     - terraform validate
   only:
     - master
@@ -211,7 +203,6 @@ validate:prod:
     AWS_ROLE_ARN: $PROD_DEPLOY_ROLE_ARN
   script:
     - terraform fmt -check -recursive
-    - terraform init -backend=false
     - terraform validate
   only:
     - master

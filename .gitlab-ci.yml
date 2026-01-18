@@ -62,9 +62,26 @@ variables:
 # Base template for Terraform jobs
 .terraform_base:
   image: hashicorp/terraform:${TF_VERSION}
+  entrypoint: [""]
   extends: .terraform_cache
   before_script:
-    - *assume_role_script
+    - |
+      GITLAB_TOKEN=${CI_JOB_JWT}
+      echo "Using OIDC token from GitLab"
+      if ! command -v aws &> /dev/null; then
+        apk add --no-cache aws-cli
+      fi
+      CREDENTIALS=$(aws sts assume-role-with-web-identity \
+        --role-arn ${AWS_ROLE_ARN} \
+        --role-session-name "gitlab-ci-${CI_JOB_ID}-${CI_COMMIT_SHORT_SHA}" \
+        --web-identity-token ${GITLAB_TOKEN} \
+        --duration-seconds 3600 \
+        --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+        --output text)
+      export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | awk '{print $1}')
+      export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | awk '{print $2}')
+      export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | awk '{print $3}')
+      echo "✅ AWS credentials obtained via OIDC"
     - cd ${TF_WORKING_DIR}
     - terraform init -backend-config=backend.conf
   retry:

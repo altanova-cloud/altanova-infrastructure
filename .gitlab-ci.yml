@@ -22,11 +22,26 @@ variables:
   AWS_REGION: "us-east-1"
   TF_VERSION: "1.8"
 
-# Assume AWS role using GitLab OIDC token
-.assume_role:
-  image: amazon/aws-cli:latest
+# Cache for Terraform
+.terraform_cache:
+  cache:
+    key:
+      files:
+        - aws/environments/*/backend.conf
+    paths:
+      - .terraform/
+      - .terraform.d/
+
+# Base template for Terraform jobs
+.terraform_base:
+  image: alpine:latest
+  extends:
+    - .terraform_cache
   before_script:
-    # Request JWT token from GitLab
+    # Install terraform and aws-cli
+    - apk add --no-cache terraform aws-cli
+
+    # Get OIDC token and assume AWS role
     - export GITLAB_JWT=$CI_JOB_JWT
     - echo "Using OIDC token from GitLab (${CI_SERVER_HOST})"
 
@@ -46,24 +61,7 @@ variables:
     - export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | awk '{print $3}')
     - echo "✅ AWS credentials obtained via OIDC"
 
-# Cache for Terraform
-.terraform_cache:
-  cache:
-    key:
-      files:
-        - aws/environments/*/backend.conf
-    paths:
-      - .terraform/
-      - .terraform.d/
-
-# Base template for Terraform jobs
-.terraform_base:
-  image: hashicorp/terraform:${TF_VERSION}
-  extends:
-    - .terraform_cache
-    - .assume_role
-  before_script:
-    - !reference [.assume_role, before_script]
+    # Initialize Terraform
     - cd ${TF_WORKING_DIR}
     - terraform init -backend-config=backend.conf
   retry:

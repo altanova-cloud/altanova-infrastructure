@@ -1,18 +1,24 @@
 # GitLab CI/CD Pipeline for Terraform Infrastructure
-# Uses OIDC authentication (no static credentials)
+# Uses OIDC authentication with AWS (no static credentials)
 # Simplified for quick deployment - no security tools, no approval gates
 #
-# Test trigger: Pipeline should start automatically on push/merge request
-#
 # Prerequisites:
-# 1. AWS credentials configured as GitLab CI/CD variables (temporary):
-#    - AWS_ACCESS_KEY_ID: AWS access key
-#    - AWS_SECRET_ACCESS_KEY: AWS secret key
-# 2. AWS region and role ARNs (optional for OIDC migration):
-#    - AWS_REGION: us-east-1 (default)
+# 1. Configure GitLab as OIDC provider in AWS:
+#    - Create OIDC Identity Provider with URL: https://gitlab.com
+#    - Thumbprint obtained from GitLab OIDC config endpoint
 #
-# TODO: Migrate to GitLab OIDC when enabled in project settings
-# This requires: Settings → Integrations → OpenID Connect → Enable
+# 2. Create IAM roles with trust policy for GitLab:
+#    - AWS_ROLE_ARN: GitLabRunnerRole (Shared account)
+#    - DEV_DEPLOY_ROLE_ARN: DevDeployRole (Dev account)
+#    - PROD_DEPLOY_ROLE_ARN: ProdDeployRole (Prod account)
+#
+# 3. Configure GitLab CI/CD variables (unprotected):
+#    - AWS_REGION: us-east-1
+#    - AWS_ROLE_ARN: arn:aws:iam::265245191272:role/GitLabRunnerRole
+#    - DEV_DEPLOY_ROLE_ARN: arn:aws:iam::975050047325:role/DevDeployRole
+#    - PROD_DEPLOY_ROLE_ARN: arn:aws:iam::624755517249:role/ProdDeployRole
+#
+# Reference: https://docs.gitlab.com/ci/cloud_services/aws/
 
 stages:
   - validate
@@ -34,48 +40,45 @@ variables:
       - .terraform/
       - .terraform.d/
 
-# OIDC Authentication script (reusable)
-.assume_role_script: &assume_role_script
-  - |
-    # Get GitLab OIDC token
-    GITLAB_TOKEN=${CI_JOB_JWT}
-    echo "Using OIDC token from GitLab"
-
-    # Install aws-cli if not present
-    if ! command -v aws &> /dev/null; then
-      apk add --no-cache aws-cli
-    fi
-
-    # Assume AWS role using OIDC token
-    CREDENTIALS=$(aws sts assume-role-with-web-identity \
-      --role-arn ${AWS_ROLE_ARN} \
-      --role-session-name "gitlab-ci-${CI_JOB_ID}-${CI_COMMIT_SHORT_SHA}" \
-      --web-identity-token ${GITLAB_TOKEN} \
-      --duration-seconds 3600 \
-      --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
-      --output text)
-
-    # Export AWS credentials
-    export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | awk '{print $1}')
-    export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | awk '{print $2}')
-    export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | awk '{print $3}')
-    echo "✅ AWS credentials obtained via OIDC"
-
 # Base template for Terraform jobs
 .terraform_base:
   image:
     name: hashicorp/terraform:${TF_VERSION}
     entrypoint: [""]
   extends: .terraform_cache
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: https://gitlab.com
   before_script:
-    # AWS credentials are automatically available from CI variables:
-    # - AWS_ACCESS_KEY_ID
-    # - AWS_SECRET_ACCESS_KEY
-    # - AWS_REGION (default: us-east-1)
     - |
-      echo "Using AWS credentials from GitLab CI variables"
-      echo "AWS_REGION: ${AWS_REGION}"
-      echo "✅ AWS credentials ready"
+      echo "Assuming AWS role using GitLab OIDC token..."
+
+      # Install aws-cli if not present
+      if ! command -v aws &> /dev/null; then
+        apk add --no-cache aws-cli
+      fi
+
+      # Verify token is present
+      if [ -z "$GITLAB_OIDC_TOKEN" ]; then
+        echo "ERROR: GITLAB_OIDC_TOKEN is empty!"
+        echo "Make sure GitLab OIDC is configured in project settings"
+        exit 1
+      fi
+
+      # Assume AWS role using OIDC token
+      CREDENTIALS=$(aws sts assume-role-with-web-identity \
+        --role-arn "${AWS_ROLE_ARN}" \
+        --role-session-name "gitlab-ci-${CI_JOB_ID}-${CI_COMMIT_SHORT_SHA}" \
+        --web-identity-token "${GITLAB_OIDC_TOKEN}" \
+        --duration-seconds 3600 \
+        --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+        --output text)
+
+      # Export AWS credentials
+      export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | awk '{print $1}')
+      export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | awk '{print $2}')
+      export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | awk '{print $3}')
+      echo "✅ AWS credentials obtained via OIDC"
     - cd ${TF_WORKING_DIR}
     - terraform init -backend-config=backend.conf
   retry:

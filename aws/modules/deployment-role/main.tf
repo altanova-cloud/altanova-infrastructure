@@ -7,7 +7,7 @@ resource "aws_iam_role" "deployment" {
       {
         Effect = "Allow"
         Principal = {
-          AWS = var.github_actions_role_arn
+          AWS = var.gitlab_runner_role_arn
         }
         Action = [
           "sts:AssumeRole",
@@ -21,7 +21,7 @@ resource "aws_iam_role" "deployment" {
     Name        = "${title(var.environment)}DeployRole"
     Environment = var.environment
     ManagedBy   = "Terraform"
-    Purpose     = "GitHub Actions deployment role"
+    Purpose     = "GitLab CI/CD deployment role"
   }
 }
 

@@ -24,20 +24,6 @@ variable "lock_table_name" {
   type        = string
 }
 
-variable "github_org" {
-  description = "GitHub organization name"
-  type        = string
-}
-
-variable "github_repo" {
-  description = "GitHub repository name"
-  type        = string
-}
-
-variable "github_oidc_provider_arn" {
-  description = "ARN of the GitHub OIDC provider (already created in AWS)"
-  type        = string
-}
 
 variable "domain_name" {
   description = "Primary domain name for the platform (registered at external registrar)"

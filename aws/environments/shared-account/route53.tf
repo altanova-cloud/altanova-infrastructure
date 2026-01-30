@@ -84,11 +84,8 @@ resource "aws_iam_policy" "route53_manage_records" {
   })
 }
 
-# Attach policy to GitHub Actions role for External DNS and cert validation
-resource "aws_iam_role_policy_attachment" "github_actions_route53" {
-  role       = module.github_oidc.role_name
-  policy_arn = aws_iam_policy.route53_manage_records.arn
-}
+# Route53 policy available for cross-account use by Dev/Prod roles
+# Can be attached via DevDeployRole/ProdDeployRole if DNS management is needed
 
 # -----------------------------------------------------------------------------
 # Outputs

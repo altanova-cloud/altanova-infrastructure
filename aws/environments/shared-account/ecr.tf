@@ -133,68 +133,11 @@ resource "aws_ecr_repository_policy" "cross_account_pull" {
           "ecr:ListImages"
         ]
       },
-      {
-        Sid    = "AllowGitHubActionsPush"
-        Effect = "Allow"
-        Principal = {
-          AWS = module.github_oidc.role_arn
-        }
-        Action = [
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:BatchGetImage",
-          "ecr:BatchCheckLayerAvailability",
-          "ecr:PutImage",
-          "ecr:InitiateLayerUpload",
-          "ecr:UploadLayerPart",
-          "ecr:CompleteLayerUpload",
-          "ecr:DescribeRepositories",
-          "ecr:DescribeImages",
-          "ecr:ListImages"
-        ]
-      }
     ]
   })
 }
 
-# -----------------------------------------------------------------------------
-# IAM Policy for GitHub Actions to push to ECR
-# Attached to GitHubActionsRole
-# -----------------------------------------------------------------------------
-resource "aws_iam_role_policy" "ecr_push" {
-  name = "ECRPush"
-  role = module.github_oidc.role_name
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "ECRAuth"
-        Effect = "Allow"
-        Action = [
-          "ecr:GetAuthorizationToken"
-        ]
-        Resource = "*"
-      },
-      {
-        Sid    = "ECRPush"
-        Effect = "Allow"
-        Action = [
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:BatchGetImage",
-          "ecr:BatchCheckLayerAvailability",
-          "ecr:PutImage",
-          "ecr:InitiateLayerUpload",
-          "ecr:UploadLayerPart",
-          "ecr:CompleteLayerUpload",
-          "ecr:DescribeRepositories",
-          "ecr:DescribeImages",
-          "ecr:ListImages"
-        ]
-        Resource = [for repo in aws_ecr_repository.services : repo.arn]
-      }
-    ]
-  })
-}
+# ECR push permissions can be managed via Dev/Prod deployment roles if needed
 
 # -----------------------------------------------------------------------------
 # Outputs

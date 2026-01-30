@@ -161,21 +161,7 @@ module "eks" {
   enable_cluster_creator_admin_permissions = true
 
   # Access entries for additional admins (optional)
-  access_entries = {
-    # Add GitHub Actions role for CI/CD access
-    github-actions = {
-      principal_arn     = var.github_actions_role_arn
-      kubernetes_groups = []
-      policy_associations = {
-        admin = {
-          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-          access_scope = {
-            type = "cluster"
-          }
-        }
-      }
-    }
-  }
+  access_entries = {}
 
   tags = local.eks_tags
 }

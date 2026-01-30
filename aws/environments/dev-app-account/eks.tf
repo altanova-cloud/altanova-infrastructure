@@ -103,7 +103,7 @@ module "eks" {
   # ---------------------------------------------------------------------------
   eks_managed_node_groups = {
     karpenter-system = {
-      name           = "${local.cluster_name}-system"
+      name           = "system"
       instance_types = ["t3.small"]
       capacity_type  = "ON_DEMAND"
 
@@ -181,7 +181,7 @@ module "karpenter" {
 
   # Karpenter node IAM role
   node_iam_role_use_name_prefix = false
-  node_iam_role_name            = "${local.cluster_name}-karpenter-node"
+  node_iam_role_name            = "karpenter-node"
 
   # Enable spot termination handling
   enable_spot_termination = true

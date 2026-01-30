@@ -11,22 +11,9 @@ module "bootstrap" {
   prod_account_id     = var.prod_account_id
 }
 
-
-# GitLab OIDC Identity Provider
-resource "aws_iam_openid_connect_provider" "gitlab" {
-  url             = "https://gitlab.com"
-  client_id_list  = ["https://gitlab.com"]
-  thumbprint_list = ["2b8f1b57330dbba2d07a6c51f70ee90ddab9ad8e"]
-
-  tags = {
-    Environment = "shared"
-    ManagedBy   = "Terraform"
-    Purpose     = "GitLab CI/CD OIDC"
-  }
-}
-
 # GitLab Runner Role (for GitLab CI/CD)
-# Trusts GitLab OIDC tokens with audience "sts.amazonaws.com" (standard for AWS STS)
+# References manually-created GitLab OIDC provider at https://gitlab.com
+# OIDC provider ARN: arn:aws:iam::265245191272:oidc-provider/gitlab.com
 resource "aws_iam_role" "gitlab_runner" {
   name = "GitLabRunnerRole"
 
@@ -35,7 +22,7 @@ resource "aws_iam_role" "gitlab_runner" {
     Statement = [{
       Effect = "Allow"
       Principal = {
-        Federated = aws_iam_openid_connect_provider.gitlab.arn
+        Federated = "arn:aws:iam::265245191272:oidc-provider/gitlab.com"
       }
       Action = "sts:AssumeRoleWithWebIdentity"
     }]
@@ -79,12 +66,6 @@ output "lock_table_arn" {
 
 output "cross_account_role_arn" {
   value = module.bootstrap.cross_account_role_arn
-}
-
-
-output "gitlab_oidc_provider_arn" {
-  description = "ARN of the GitLab OIDC provider"
-  value       = aws_iam_openid_connect_provider.gitlab.arn
 }
 
 output "gitlab_runner_role_arn" {

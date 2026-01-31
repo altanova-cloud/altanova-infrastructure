@@ -12,3 +12,6 @@ variable "gitlab_runner_role_arn" {
   type        = string
   default     = "arn:aws:iam::265245191272:role/GitLabRunnerRole"
 }
+
+# Note: domain_name and route53_zone_id are only used in Shared account
+# Prod uses only VPC and IAM infrastructure

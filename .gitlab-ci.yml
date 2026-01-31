@@ -97,7 +97,7 @@ validate:shared:
   stage: validate
   variables:
     TF_WORKING_DIR: aws/environments/shared-account
-    AWS_ROLE_ARN: $AWS_ROLE_ARN
+    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
   script:
     - terraform fmt -check -recursive
     - terraform validate
@@ -110,7 +110,7 @@ plan:shared:
   stage: plan
   variables:
     TF_WORKING_DIR: aws/environments/shared-account
-    AWS_ROLE_ARN: $AWS_ROLE_ARN
+    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
   script:
     - terraform plan -no-color -out=tfplan | tee plan_output.txt
   artifacts:
@@ -129,7 +129,7 @@ apply:shared:
   stage: apply
   variables:
     TF_WORKING_DIR: aws/environments/shared-account
-    AWS_ROLE_ARN: $AWS_ROLE_ARN
+    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
   script:
     - terraform apply -auto-approve -no-color tfplan
   dependencies:
@@ -147,7 +147,7 @@ validate:dev:
   stage: validate
   variables:
     TF_WORKING_DIR: aws/environments/dev-app-account
-    AWS_ROLE_ARN: $DEV_DEPLOY_ROLE_ARN
+    AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
   script:
     - terraform fmt -check -recursive
     - terraform validate
@@ -160,7 +160,7 @@ plan:dev:
   stage: plan
   variables:
     TF_WORKING_DIR: aws/environments/dev-app-account
-    AWS_ROLE_ARN: $DEV_DEPLOY_ROLE_ARN
+    AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
   script:
     - terraform plan -no-color -out=tfplan | tee plan_output.txt
   artifacts:
@@ -179,7 +179,7 @@ apply:dev:
   stage: apply
   variables:
     TF_WORKING_DIR: aws/environments/dev-app-account
-    AWS_ROLE_ARN: $DEV_DEPLOY_ROLE_ARN
+    AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
   script:
     - terraform apply -auto-approve -no-color tfplan
   dependencies:
@@ -193,7 +193,7 @@ destroy:dev:
   stage: destroy
   variables:
     TF_WORKING_DIR: aws/environments/dev-app-account
-    AWS_ROLE_ARN: $DEV_DEPLOY_ROLE_ARN
+    AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
   script:
     - echo "🔴 DESTROYING Dev Account Infrastructure"
     - terraform plan -destroy -no-color -out=destroy.tfplan | tee destroy_plan.txt
@@ -215,7 +215,7 @@ validate:prod:
   stage: validate
   variables:
     TF_WORKING_DIR: aws/environments/prod-app-account
-    AWS_ROLE_ARN: $PROD_DEPLOY_ROLE_ARN
+    AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
   script:
     - terraform fmt -check -recursive
     - terraform validate
@@ -228,7 +228,7 @@ plan:prod:
   stage: plan
   variables:
     TF_WORKING_DIR: aws/environments/prod-app-account
-    AWS_ROLE_ARN: $PROD_DEPLOY_ROLE_ARN
+    AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
   script:
     - terraform plan -no-color -out=tfplan | tee plan_output.txt
   artifacts:
@@ -247,7 +247,7 @@ apply:prod:
   stage: apply
   variables:
     TF_WORKING_DIR: aws/environments/prod-app-account
-    AWS_ROLE_ARN: $PROD_DEPLOY_ROLE_ARN
+    AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
   script:
     - terraform apply -auto-approve -no-color tfplan
   dependencies:
@@ -261,7 +261,7 @@ destroy:prod:
   stage: destroy
   variables:
     TF_WORKING_DIR: aws/environments/prod-app-account
-    AWS_ROLE_ARN: $PROD_DEPLOY_ROLE_ARN
+    AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
   script:
     - echo "🔴 DESTROYING Prod Account Infrastructure"
     - terraform plan -destroy -no-color -out=destroy.tfplan | tee destroy_plan.txt

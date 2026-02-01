@@ -1,0 +1,107 @@
+# =============================================================================
+# Environments Configuration
+# =============================================================================
+#
+# Master configuration for CI/CD pipeline.
+# ALL resources use Terraform workspaces for environment + region separation.
+#
+# Directory Structure:
+#   - aws/shared/vpc, route53, ecr (Workspaces: shared-euw1, shared-eus2, etc.)
+#   - aws/iam (Workspaces: dev-euw1, prod-euw1, dev-eus2, etc.)
+#   - aws/eks (Workspaces: dev-euw1, prod-euw1, dev-eus2, etc.)
+#
+# Workspace Naming: {env}-{region_code}
+#   - shared-euw1 (Shared in eu-west-1)
+#   - dev-euw1    (Dev in eu-west-1)
+#   - prod-euw1   (Prod in eu-west-1)
+#   - dev-eus2    (Dev in eu-south-2 Spain)
+#   - dev-use1    (Dev in us-east-1)
+#
+# Region Codes:
+#   - euw1 = eu-west-1 (Ireland)
+#   - euw2 = eu-west-2 (London)
+#   - eus2 = eu-south-2 (Spain)
+#   - use1 = us-east-1 (N. Virginia)
+#   - use2 = us-east-2 (Ohio)
+# =============================================================================
+
+accounts:
+  shared:
+    account_id: "265245191272"
+    role_arn: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
+
+  dev:
+    account_id: "975050047325"
+    role_arn: "arn:aws:iam::975050047325:role/DevDeployRole"
+
+  prod:
+    account_id: "624755517249"
+    role_arn: "arn:aws:iam::624755517249:role/ProdDeployRole"
+
+# -----------------------------------------------------------------------------
+# Shared Account Resources (workspace based)
+# -----------------------------------------------------------------------------
+workspaces:
+  vpc:
+    path: aws/shared/vpc
+    state_name: vpc
+    environments:
+      - shared-euw1
+      # Future:
+      # - shared-eus2
+      # - shared-use1
+
+  route53:
+    path: aws/shared/route53
+    state_name: route53
+    environments:
+      - shared-euw1
+      # Note: Route53 is global, but we use workspace for consistency
+
+  ecr:
+    path: aws/shared/ecr
+    state_name: ecr
+    environments:
+      - shared-euw1
+      # Future:
+      # - shared-eus2
+      # - shared-use1
+
+  iam:
+    path: aws/iam
+    state_name: iam
+    environments:
+      - dev-euw1
+      - prod-euw1
+      # Future:
+      # - dev-eus2
+      # - dev-use1
+
+  eks:
+    path: aws/eks
+    state_name: eks
+    environments:
+      - dev-euw1
+      - prod-euw1
+      # Future:
+      # - dev-eus2
+      # - dev-use1
+
+# =============================================================================
+# Deployment Order
+# =============================================================================
+#
+# Phase 1: Shared Account (workspace: shared-euw1)
+#   1. vpc (shared-euw1)     - Creates VPC, subnets, NAT, RAM shares
+#   2. route53 (shared-euw1) - Creates hosted zone
+#   3. ecr (shared-euw1)     - Creates container registries
+#
+# Phase 2: Dev Environment (workspace: dev-euw1)
+#   4. iam (dev-euw1)        - Creates DevDeployRole
+#   5. eks (dev-euw1)        - Creates EKS cluster in shared subnets
+#
+# Phase 3: Prod Environment (workspace: prod-euw1)
+#   6. iam (prod-euw1)       - Creates ProdDeployRole
+#   7. eks (prod-euw1)       - Creates EKS cluster in shared subnets
+#
+# =============================================================================

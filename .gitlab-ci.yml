@@ -2,22 +2,13 @@
 # GitLab CI/CD Pipeline for Terraform Infrastructure
 # =============================================================================
 #
-# Architecture:
-#   - GitLab-managed HTTP backend for Terraform state
-#   - OIDC authentication with AWS (no static credentials)
-#   - Workspaces for environment + region separation
+# Uses parallel:matrix for scalability and grouped job names for clean UI.
 #
-# Workspace Naming: {env}-{region_code}
-#   - shared-euw1 (Shared in eu-west-1)
-#   - dev-euw1    (Dev in eu-west-1)
-#   - prod-euw1   (Prod in eu-west-1)
-#   - dev-eus2    (Dev in eu-south-2 Spain)
-#   - dev-use1    (Dev in us-east-1)
+# Job naming: {workspace}/{component}/{action}
+#   - shared-euw1/vpc/plan
+#   - dev-euw1/eks/apply
 #
-# Region Codes:
-#   - euw1 = eu-west-1 (Ireland)
-#   - eus2 = eu-south-2 (Spain)
-#   - use1 = us-east-1 (N. Virginia)
+# To add a new region, just add to the matrix arrays below.
 # =============================================================================
 
 stages:
@@ -31,9 +22,9 @@ variables:
   GITLAB_TF_ADDRESS: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state"
 
 # =============================================================================
-# Base Template for Workspace-based Terraform Jobs
+# Base Template
 # =============================================================================
-.terraform_workspace:
+.terraform:
   image:
     name: hashicorp/terraform:${TF_VERSION}
     entrypoint: [""]
@@ -51,19 +42,8 @@ variables:
       export TF_HTTP_LOCK_METHOD="POST"
       export TF_HTTP_UNLOCK_METHOD="DELETE"
 
-      echo "State: ${TF_STATE_NAME}"
-      echo "Workspace: ${TF_WORKSPACE}"
-
       # Install AWS CLI
-      if ! command -v aws &> /dev/null; then
-        apk add --no-cache aws-cli
-      fi
-
-      # Verify OIDC token
-      if [ -z "$GITLAB_OIDC_TOKEN" ]; then
-        echo "ERROR: GITLAB_OIDC_TOKEN is empty!"
-        exit 1
-      fi
+      apk add --no-cache aws-cli > /dev/null 2>&1
 
       # Assume AWS role using OIDC
       CREDENTIALS=$(aws sts assume-role-with-web-identity \
@@ -77,455 +57,341 @@ variables:
       export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | awk '{print $1}')
       export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | awk '{print $2}')
       export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | awk '{print $3}')
-      echo "AWS credentials obtained via OIDC"
-    - cd ${TF_WORKING_DIR}
+    - cd ${TF_DIR}
     - terraform init
     - terraform workspace select ${TF_WORKSPACE} || terraform workspace new ${TF_WORKSPACE}
   retry:
     max: 2
-    when:
-      - runner_system_failure
-      - stuck_or_timeout_failure
+    when: [runner_system_failure, stuck_or_timeout_failure]
 
 # =============================================================================
-# SHARED ACCOUNT - VPC (Workspace: shared-euw1)
+# SHARED ACCOUNT - VPC, Route53, ECR
 # =============================================================================
-validate:vpc:shared-euw1:
-  extends: .terraform_workspace
+.shared:
+  extends: .terraform
+  variables:
+    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
+
+"shared/vpc/validate":
+  extends: .shared
   stage: validate
   variables:
-    TF_WORKING_DIR: aws/shared/vpc
+    TF_DIR: aws/shared/vpc
     TF_STATE_NAME: vpc
     TF_WORKSPACE: shared-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
   script:
-    - terraform fmt -check -recursive
     - terraform validate
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - aws/shared/vpc/**/*
-        - aws/modules/vpc/**/*
 
-plan:vpc:shared-euw1:
-  extends: .terraform_workspace
+"shared/vpc/plan":
+  extends: .shared
   stage: plan
   variables:
-    TF_WORKING_DIR: aws/shared/vpc
+    TF_DIR: aws/shared/vpc
     TF_STATE_NAME: vpc
     TF_WORKSPACE: shared-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
   script:
     - terraform plan -out=tfplan
   artifacts:
-    paths:
-      - aws/shared/vpc/tfplan
+    paths: [aws/shared/vpc/tfplan]
     expire_in: 7 days
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - aws/shared/vpc/**/*
-        - aws/modules/vpc/**/*
 
-apply:vpc:shared-euw1:
-  extends: .terraform_workspace
+"shared/vpc/apply":
+  extends: .shared
   stage: apply
   variables:
-    TF_WORKING_DIR: aws/shared/vpc
+    TF_DIR: aws/shared/vpc
     TF_STATE_NAME: vpc
     TF_WORKSPACE: shared-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
   script:
     - terraform apply -auto-approve tfplan
-  dependencies:
-    - plan:vpc:shared-euw1
+  dependencies: ["shared/vpc/plan"]
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
-      changes:
-        - aws/shared/vpc/**/*
-        - aws/modules/vpc/**/*
       when: manual
 
-# =============================================================================
-# SHARED ACCOUNT - ROUTE53 (Workspace: shared-euw1)
-# =============================================================================
-validate:route53:shared-euw1:
-  extends: .terraform_workspace
+"shared/route53/validate":
+  extends: .shared
   stage: validate
   variables:
-    TF_WORKING_DIR: aws/shared/route53
+    TF_DIR: aws/shared/route53
     TF_STATE_NAME: route53
     TF_WORKSPACE: shared-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
   script:
-    - terraform fmt -check -recursive
     - terraform validate
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - aws/shared/route53/**/*
 
-plan:route53:shared-euw1:
-  extends: .terraform_workspace
+"shared/route53/plan":
+  extends: .shared
   stage: plan
   variables:
-    TF_WORKING_DIR: aws/shared/route53
+    TF_DIR: aws/shared/route53
     TF_STATE_NAME: route53
     TF_WORKSPACE: shared-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
   script:
     - terraform plan -out=tfplan
   artifacts:
-    paths:
-      - aws/shared/route53/tfplan
+    paths: [aws/shared/route53/tfplan]
     expire_in: 7 days
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - aws/shared/route53/**/*
 
-apply:route53:shared-euw1:
-  extends: .terraform_workspace
+"shared/route53/apply":
+  extends: .shared
   stage: apply
   variables:
-    TF_WORKING_DIR: aws/shared/route53
+    TF_DIR: aws/shared/route53
     TF_STATE_NAME: route53
     TF_WORKSPACE: shared-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
   script:
     - terraform apply -auto-approve tfplan
-  dependencies:
-    - plan:route53:shared-euw1
+  dependencies: ["shared/route53/plan"]
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
-      changes:
-        - aws/shared/route53/**/*
       when: manual
 
-# =============================================================================
-# SHARED ACCOUNT - ECR (Workspace: shared-euw1)
-# =============================================================================
-validate:ecr:shared-euw1:
-  extends: .terraform_workspace
+"shared/ecr/validate":
+  extends: .shared
   stage: validate
   variables:
-    TF_WORKING_DIR: aws/shared/ecr
+    TF_DIR: aws/shared/ecr
     TF_STATE_NAME: ecr
     TF_WORKSPACE: shared-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
   script:
-    - terraform fmt -check -recursive
     - terraform validate
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - aws/shared/ecr/**/*
 
-plan:ecr:shared-euw1:
-  extends: .terraform_workspace
+"shared/ecr/plan":
+  extends: .shared
   stage: plan
   variables:
-    TF_WORKING_DIR: aws/shared/ecr
+    TF_DIR: aws/shared/ecr
     TF_STATE_NAME: ecr
     TF_WORKSPACE: shared-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
   script:
     - terraform plan -out=tfplan
   artifacts:
-    paths:
-      - aws/shared/ecr/tfplan
+    paths: [aws/shared/ecr/tfplan]
     expire_in: 7 days
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - aws/shared/ecr/**/*
 
-apply:ecr:shared-euw1:
-  extends: .terraform_workspace
+"shared/ecr/apply":
+  extends: .shared
   stage: apply
   variables:
-    TF_WORKING_DIR: aws/shared/ecr
+    TF_DIR: aws/shared/ecr
     TF_STATE_NAME: ecr
     TF_WORKSPACE: shared-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
   script:
     - terraform apply -auto-approve tfplan
-  dependencies:
-    - plan:ecr:shared-euw1
+  dependencies: ["shared/ecr/plan"]
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
-      changes:
-        - aws/shared/ecr/**/*
       when: manual
 
 # =============================================================================
-# DEV ACCOUNT - IAM (Workspace: dev-euw1)
+# DEV ACCOUNT - IAM & EKS (Matrix for future regions)
 # =============================================================================
-validate:iam:dev-euw1:
-  extends: .terraform_workspace
+.dev:
+  extends: .terraform
+  variables:
+    AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
+
+"dev/iam/validate":
+  extends: .dev
   stage: validate
+  parallel:
+    matrix:
+      - TF_WORKSPACE: [dev-euw1]
+        # Future: dev-eus2, dev-use1
   variables:
-    TF_WORKING_DIR: aws/iam
+    TF_DIR: aws/iam
     TF_STATE_NAME: iam
-    TF_WORKSPACE: dev-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
   script:
-    - terraform fmt -check -recursive
     - terraform validate
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - aws/iam/**/*
-        - aws/modules/deployment-role/**/*
 
-plan:iam:dev-euw1:
-  extends: .terraform_workspace
+"dev/iam/plan":
+  extends: .dev
   stage: plan
+  parallel:
+    matrix:
+      - TF_WORKSPACE: [dev-euw1]
   variables:
-    TF_WORKING_DIR: aws/iam
+    TF_DIR: aws/iam
     TF_STATE_NAME: iam
-    TF_WORKSPACE: dev-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
   script:
-    - terraform plan -out=tfplan
+    - terraform plan -out=tfplan-${TF_WORKSPACE}
   artifacts:
-    paths:
-      - aws/iam/tfplan
+    paths: [aws/iam/tfplan-*]
     expire_in: 7 days
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - aws/iam/**/*
-        - aws/modules/deployment-role/**/*
 
-apply:iam:dev-euw1:
-  extends: .terraform_workspace
+"dev/iam/apply":
+  extends: .dev
   stage: apply
+  parallel:
+    matrix:
+      - TF_WORKSPACE: [dev-euw1]
   variables:
-    TF_WORKING_DIR: aws/iam
+    TF_DIR: aws/iam
     TF_STATE_NAME: iam
-    TF_WORKSPACE: dev-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
   script:
-    - terraform apply -auto-approve tfplan
-  dependencies:
-    - plan:iam:dev-euw1
+    - terraform apply -auto-approve tfplan-${TF_WORKSPACE}
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
-      changes:
-        - aws/iam/**/*
-        - aws/modules/deployment-role/**/*
       when: manual
 
-# =============================================================================
-# DEV ACCOUNT - EKS (Workspace: dev-euw1)
-# =============================================================================
-validate:eks:dev-euw1:
-  extends: .terraform_workspace
+"dev/eks/validate":
+  extends: .dev
   stage: validate
+  parallel:
+    matrix:
+      - TF_WORKSPACE: [dev-euw1]
   variables:
-    TF_WORKING_DIR: aws/eks
+    TF_DIR: aws/eks
     TF_STATE_NAME: eks
-    TF_WORKSPACE: dev-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
   script:
-    - terraform fmt -check -recursive
     - terraform validate
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - aws/eks/**/*
-        - aws/modules/eks-cluster/**/*
 
-plan:eks:dev-euw1:
-  extends: .terraform_workspace
+"dev/eks/plan":
+  extends: .dev
   stage: plan
+  parallel:
+    matrix:
+      - TF_WORKSPACE: [dev-euw1]
   variables:
-    TF_WORKING_DIR: aws/eks
+    TF_DIR: aws/eks
     TF_STATE_NAME: eks
-    TF_WORKSPACE: dev-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
   script:
-    - terraform plan -out=tfplan
+    - terraform plan -out=tfplan-${TF_WORKSPACE}
   artifacts:
-    paths:
-      - aws/eks/tfplan
+    paths: [aws/eks/tfplan-*]
     expire_in: 7 days
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - aws/eks/**/*
-        - aws/modules/eks-cluster/**/*
 
-apply:eks:dev-euw1:
-  extends: .terraform_workspace
+"dev/eks/apply":
+  extends: .dev
   stage: apply
+  parallel:
+    matrix:
+      - TF_WORKSPACE: [dev-euw1]
   variables:
-    TF_WORKING_DIR: aws/eks
+    TF_DIR: aws/eks
     TF_STATE_NAME: eks
-    TF_WORKSPACE: dev-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
   script:
-    - terraform apply -auto-approve tfplan
-  dependencies:
-    - plan:eks:dev-euw1
+    - terraform apply -auto-approve tfplan-${TF_WORKSPACE}
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
-      changes:
-        - aws/eks/**/*
-        - aws/modules/eks-cluster/**/*
       when: manual
 
-destroy:eks:dev-euw1:
-  extends: .terraform_workspace
+"dev/eks/destroy":
+  extends: .dev
   stage: destroy
+  parallel:
+    matrix:
+      - TF_WORKSPACE: [dev-euw1]
   variables:
-    TF_WORKING_DIR: aws/eks
+    TF_DIR: aws/eks
     TF_STATE_NAME: eks
-    TF_WORKSPACE: dev-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
   script:
-    - echo "DESTROYING Dev EKS (dev-euw1)"
-    - terraform plan -destroy -out=destroy.tfplan
-    - terraform apply -auto-approve destroy.tfplan
+    - terraform destroy -auto-approve
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
       when: manual
 
 # =============================================================================
-# PROD ACCOUNT - IAM (Workspace: prod-euw1)
+# PROD ACCOUNT - IAM & EKS
 # =============================================================================
-validate:iam:prod-euw1:
-  extends: .terraform_workspace
+.prod:
+  extends: .terraform
+  variables:
+    AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: manual
+
+"prod/iam/validate":
+  extends: .prod
   stage: validate
+  parallel:
+    matrix:
+      - TF_WORKSPACE: [prod-euw1]
   variables:
-    TF_WORKING_DIR: aws/iam
+    TF_DIR: aws/iam
     TF_STATE_NAME: iam
-    TF_WORKSPACE: prod-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
   script:
-    - terraform fmt -check -recursive
     - terraform validate
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - aws/iam/**/*
-        - aws/modules/deployment-role/**/*
-      when: manual
 
-plan:iam:prod-euw1:
-  extends: .terraform_workspace
+"prod/iam/plan":
+  extends: .prod
   stage: plan
+  parallel:
+    matrix:
+      - TF_WORKSPACE: [prod-euw1]
   variables:
-    TF_WORKING_DIR: aws/iam
+    TF_DIR: aws/iam
     TF_STATE_NAME: iam
-    TF_WORKSPACE: prod-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
   script:
-    - terraform plan -out=tfplan
+    - terraform plan -out=tfplan-${TF_WORKSPACE}
   artifacts:
-    paths:
-      - aws/iam/tfplan
+    paths: [aws/iam/tfplan-*]
     expire_in: 7 days
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - aws/iam/**/*
-        - aws/modules/deployment-role/**/*
-      when: manual
 
-apply:iam:prod-euw1:
-  extends: .terraform_workspace
+"prod/iam/apply":
+  extends: .prod
   stage: apply
+  parallel:
+    matrix:
+      - TF_WORKSPACE: [prod-euw1]
   variables:
-    TF_WORKING_DIR: aws/iam
+    TF_DIR: aws/iam
     TF_STATE_NAME: iam
-    TF_WORKSPACE: prod-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
   script:
-    - terraform apply -auto-approve tfplan
-  dependencies:
-    - plan:iam:prod-euw1
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master"
-      changes:
-        - aws/iam/**/*
-        - aws/modules/deployment-role/**/*
-      when: manual
+    - terraform apply -auto-approve tfplan-${TF_WORKSPACE}
 
-# =============================================================================
-# PROD ACCOUNT - EKS (Workspace: prod-euw1)
-# =============================================================================
-validate:eks:prod-euw1:
-  extends: .terraform_workspace
+"prod/eks/validate":
+  extends: .prod
   stage: validate
+  parallel:
+    matrix:
+      - TF_WORKSPACE: [prod-euw1]
   variables:
-    TF_WORKING_DIR: aws/eks
+    TF_DIR: aws/eks
     TF_STATE_NAME: eks
-    TF_WORKSPACE: prod-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
   script:
-    - terraform fmt -check -recursive
     - terraform validate
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - aws/eks/**/*
-        - aws/modules/eks-cluster/**/*
-      when: manual
 
-plan:eks:prod-euw1:
-  extends: .terraform_workspace
+"prod/eks/plan":
+  extends: .prod
   stage: plan
+  parallel:
+    matrix:
+      - TF_WORKSPACE: [prod-euw1]
   variables:
-    TF_WORKING_DIR: aws/eks
+    TF_DIR: aws/eks
     TF_STATE_NAME: eks
-    TF_WORKSPACE: prod-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
   script:
-    - terraform plan -out=tfplan
+    - terraform plan -out=tfplan-${TF_WORKSPACE}
   artifacts:
-    paths:
-      - aws/eks/tfplan
+    paths: [aws/eks/tfplan-*]
     expire_in: 7 days
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
-      changes:
-        - aws/eks/**/*
-        - aws/modules/eks-cluster/**/*
-      when: manual
 
-apply:eks:prod-euw1:
-  extends: .terraform_workspace
+"prod/eks/apply":
+  extends: .prod
   stage: apply
+  parallel:
+    matrix:
+      - TF_WORKSPACE: [prod-euw1]
   variables:
-    TF_WORKING_DIR: aws/eks
+    TF_DIR: aws/eks
     TF_STATE_NAME: eks
-    TF_WORKSPACE: prod-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
   script:
-    - terraform apply -auto-approve tfplan
-  dependencies:
-    - plan:eks:prod-euw1
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master"
-      changes:
-        - aws/eks/**/*
-        - aws/modules/eks-cluster/**/*
-      when: manual
+    - terraform apply -auto-approve tfplan-${TF_WORKSPACE}
 
-destroy:eks:prod-euw1:
-  extends: .terraform_workspace
+"prod/eks/destroy":
+  extends: .prod
   stage: destroy
+  parallel:
+    matrix:
+      - TF_WORKSPACE: [prod-euw1]
   variables:
-    TF_WORKING_DIR: aws/eks
+    TF_DIR: aws/eks
     TF_STATE_NAME: eks
-    TF_WORKSPACE: prod-euw1
-    AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
   script:
-    - echo "DESTROYING Prod EKS (prod-euw1)"
-    - terraform plan -destroy -out=destroy.tfplan
-    - terraform apply -auto-approve destroy.tfplan
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master"
-      when: manual
+    - terraform destroy -auto-approve

@@ -2,21 +2,18 @@
 # GitLab CI/CD Pipeline for Terraform Infrastructure
 # =============================================================================
 #
-# Folder-based structure (no workspaces):
-#   aws/shared-euw1/vpc    → State: shared-euw1-vpc
-#   aws/dev-euw1/eks       → State: dev-euw1-eks
-#   aws/prod-euw1/iam      → State: prod-euw1-iam
+# Stages organized by environment for clear UI:
+#   Stage 1: shared-euw1 (VPC, Route53, ECR)
+#   Stage 2: dev-euw1 (IAM, EKS)
+#   Stage 3: prod-euw1 (IAM, EKS)
+#   Stage 4: destroy (manual only)
 #
-# To add a new region:
-#   1. Copy folder (e.g., cp -r aws/dev-euw1 aws/dev-eus2)
-#   2. Update region in main.tf
-#   3. Add CI jobs below
 # =============================================================================
 
 stages:
-  - validate
-  - plan
-  - apply
+  - shared-euw1
+  - dev-euw1
+  - prod-euw1
   - destroy
 
 variables:
@@ -35,7 +32,6 @@ variables:
       aud: sts.amazonaws.com
   before_script:
     - |
-      # Configure GitLab HTTP backend
       export TF_HTTP_ADDRESS="${GITLAB_TF_ADDRESS}/${TF_STATE_NAME}"
       export TF_HTTP_LOCK_ADDRESS="${TF_HTTP_ADDRESS}/lock"
       export TF_HTTP_UNLOCK_ADDRESS="${TF_HTTP_ADDRESS}/lock"
@@ -44,10 +40,8 @@ variables:
       export TF_HTTP_LOCK_METHOD="POST"
       export TF_HTTP_UNLOCK_METHOD="DELETE"
 
-      # Install AWS CLI
       apk add --no-cache aws-cli > /dev/null 2>&1
 
-      # Assume AWS role using OIDC
       CREDENTIALS=$(aws sts assume-role-with-web-identity \
         --role-arn "${AWS_ROLE_ARN}" \
         --role-session-name "gitlab-ci-${CI_JOB_ID}" \
@@ -66,269 +60,258 @@ variables:
     when: [runner_system_failure, stuck_or_timeout_failure]
 
 # =============================================================================
-# SHARED-EUW1 (Shared Account - eu-west-1)
+# STAGE: shared-euw1 (Shared Account - eu-west-1)
 # =============================================================================
-.shared-euw1:
+"vpc:plan":
   extends: .terraform
+  stage: shared-euw1
   variables:
+    TF_DIR: aws/shared-euw1/vpc
+    TF_STATE_NAME: shared-euw1-vpc
     AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
-
-# VPC
-"shared-euw1/vpc/validate":
-  extends: .shared-euw1
-  stage: validate
-  variables:
-    TF_DIR: aws/shared-euw1/vpc
-    TF_STATE_NAME: shared-euw1-vpc
-  script: [terraform validate]
-
-"shared-euw1/vpc/plan":
-  extends: .shared-euw1
-  stage: plan
-  variables:
-    TF_DIR: aws/shared-euw1/vpc
-    TF_STATE_NAME: shared-euw1-vpc
-  script: [terraform plan -out=tfplan]
+  script:
+    - terraform validate
+    - terraform plan -out=tfplan
   artifacts:
     paths: [aws/shared-euw1/vpc/tfplan]
     expire_in: 7 days
-
-"shared-euw1/vpc/apply":
-  extends: .shared-euw1
-  stage: apply
-  variables:
-    TF_DIR: aws/shared-euw1/vpc
-    TF_STATE_NAME: shared-euw1-vpc
-  script: [terraform apply -auto-approve tfplan]
-  dependencies: ["shared-euw1/vpc/plan"]
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master"
-      when: manual
-
-# Route53
-"shared-euw1/route53/validate":
-  extends: .shared-euw1
-  stage: validate
-  variables:
-    TF_DIR: aws/shared-euw1/route53
-    TF_STATE_NAME: shared-euw1-route53
-  script: [terraform validate]
-
-"shared-euw1/route53/plan":
-  extends: .shared-euw1
-  stage: plan
-  variables:
-    TF_DIR: aws/shared-euw1/route53
-    TF_STATE_NAME: shared-euw1-route53
-  script: [terraform plan -out=tfplan]
-  artifacts:
-    paths: [aws/shared-euw1/route53/tfplan]
-    expire_in: 7 days
-
-"shared-euw1/route53/apply":
-  extends: .shared-euw1
-  stage: apply
-  variables:
-    TF_DIR: aws/shared-euw1/route53
-    TF_STATE_NAME: shared-euw1-route53
-  script: [terraform apply -auto-approve tfplan]
-  dependencies: ["shared-euw1/route53/plan"]
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master"
-      when: manual
-
-# ECR
-"shared-euw1/ecr/validate":
-  extends: .shared-euw1
-  stage: validate
-  variables:
-    TF_DIR: aws/shared-euw1/ecr
-    TF_STATE_NAME: shared-euw1-ecr
-  script: [terraform validate]
-
-"shared-euw1/ecr/plan":
-  extends: .shared-euw1
-  stage: plan
-  variables:
-    TF_DIR: aws/shared-euw1/ecr
-    TF_STATE_NAME: shared-euw1-ecr
-  script: [terraform plan -out=tfplan]
-  artifacts:
-    paths: [aws/shared-euw1/ecr/tfplan]
-    expire_in: 7 days
-
-"shared-euw1/ecr/apply":
-  extends: .shared-euw1
-  stage: apply
-  variables:
-    TF_DIR: aws/shared-euw1/ecr
-    TF_STATE_NAME: shared-euw1-ecr
-  script: [terraform apply -auto-approve tfplan]
-  dependencies: ["shared-euw1/ecr/plan"]
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master"
-      when: manual
-
-# =============================================================================
-# DEV-EUW1 (Dev Account - eu-west-1)
-# =============================================================================
-.dev-euw1:
-  extends: .terraform
-  variables:
-    AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
   rules:
     - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
 
-# IAM
-"dev-euw1/iam/validate":
-  extends: .dev-euw1
-  stage: validate
+"vpc:apply":
+  extends: .terraform
+  stage: shared-euw1
   variables:
-    TF_DIR: aws/dev-euw1/iam
-    TF_STATE_NAME: dev-euw1-iam
-  script: [terraform validate]
+    TF_DIR: aws/shared-euw1/vpc
+    TF_STATE_NAME: shared-euw1-vpc
+    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
+  script:
+    - terraform apply -auto-approve tfplan
+  dependencies: ["vpc:plan"]
+  needs: ["vpc:plan"]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: manual
 
-"dev-euw1/iam/plan":
-  extends: .dev-euw1
-  stage: plan
+"route53:plan":
+  extends: .terraform
+  stage: shared-euw1
+  variables:
+    TF_DIR: aws/shared-euw1/route53
+    TF_STATE_NAME: shared-euw1-route53
+    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
+  script:
+    - terraform validate
+    - terraform plan -out=tfplan
+  artifacts:
+    paths: [aws/shared-euw1/route53/tfplan]
+    expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
+
+"route53:apply":
+  extends: .terraform
+  stage: shared-euw1
+  variables:
+    TF_DIR: aws/shared-euw1/route53
+    TF_STATE_NAME: shared-euw1-route53
+    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
+  script:
+    - terraform apply -auto-approve tfplan
+  dependencies: ["route53:plan"]
+  needs: ["route53:plan"]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: manual
+
+"ecr:plan":
+  extends: .terraform
+  stage: shared-euw1
+  variables:
+    TF_DIR: aws/shared-euw1/ecr
+    TF_STATE_NAME: shared-euw1-ecr
+    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
+  script:
+    - terraform validate
+    - terraform plan -out=tfplan
+  artifacts:
+    paths: [aws/shared-euw1/ecr/tfplan]
+    expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
+
+"ecr:apply":
+  extends: .terraform
+  stage: shared-euw1
+  variables:
+    TF_DIR: aws/shared-euw1/ecr
+    TF_STATE_NAME: shared-euw1-ecr
+    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
+  script:
+    - terraform apply -auto-approve tfplan
+  dependencies: ["ecr:plan"]
+  needs: ["ecr:plan"]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: manual
+
+# =============================================================================
+# STAGE: dev-euw1 (Dev Account - eu-west-1)
+# =============================================================================
+"dev:iam:plan":
+  extends: .terraform
+  stage: dev-euw1
   variables:
     TF_DIR: aws/dev-euw1/iam
     TF_STATE_NAME: dev-euw1-iam
-  script: [terraform plan -out=tfplan]
+    AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
+  script:
+    - terraform validate
+    - terraform plan -out=tfplan
   artifacts:
     paths: [aws/dev-euw1/iam/tfplan]
     expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
 
-"dev-euw1/iam/apply":
-  extends: .dev-euw1
-  stage: apply
+"dev:iam:apply":
+  extends: .terraform
+  stage: dev-euw1
   variables:
     TF_DIR: aws/dev-euw1/iam
     TF_STATE_NAME: dev-euw1-iam
-  script: [terraform apply -auto-approve tfplan]
-  dependencies: ["dev-euw1/iam/plan"]
+    AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
+  script:
+    - terraform apply -auto-approve tfplan
+  dependencies: ["dev:iam:plan"]
+  needs: ["dev:iam:plan"]
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
       when: manual
 
-# EKS
-"dev-euw1/eks/validate":
-  extends: .dev-euw1
-  stage: validate
+"dev:eks:plan":
+  extends: .terraform
+  stage: dev-euw1
   variables:
     TF_DIR: aws/dev-euw1/eks
     TF_STATE_NAME: dev-euw1-eks
-  script: [terraform validate]
-
-"dev-euw1/eks/plan":
-  extends: .dev-euw1
-  stage: plan
-  variables:
-    TF_DIR: aws/dev-euw1/eks
-    TF_STATE_NAME: dev-euw1-eks
-  script: [terraform plan -out=tfplan]
+    AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
+  script:
+    - terraform validate
+    - terraform plan -out=tfplan
   artifacts:
     paths: [aws/dev-euw1/eks/tfplan]
     expire_in: 7 days
-
-"dev-euw1/eks/apply":
-  extends: .dev-euw1
-  stage: apply
-  variables:
-    TF_DIR: aws/dev-euw1/eks
-    TF_STATE_NAME: dev-euw1-eks
-  script: [terraform apply -auto-approve tfplan]
-  dependencies: ["dev-euw1/eks/plan"]
   rules:
-    - if: $CI_COMMIT_BRANCH == "master"
-      when: manual
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
 
-"dev-euw1/eks/destroy":
-  extends: .dev-euw1
-  stage: destroy
-  variables:
-    TF_DIR: aws/dev-euw1/eks
-    TF_STATE_NAME: dev-euw1-eks
-  script: [terraform destroy -auto-approve]
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master"
-      when: manual
-
-# =============================================================================
-# PROD-EUW1 (Prod Account - eu-west-1)
-# =============================================================================
-.prod-euw1:
+"dev:eks:apply":
   extends: .terraform
+  stage: dev-euw1
   variables:
-    AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
+    TF_DIR: aws/dev-euw1/eks
+    TF_STATE_NAME: dev-euw1-eks
+    AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
+  script:
+    - terraform apply -auto-approve tfplan
+  dependencies: ["dev:eks:plan"]
+  needs: ["dev:eks:plan"]
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
       when: manual
 
-# IAM
-"prod-euw1/iam/validate":
-  extends: .prod-euw1
-  stage: validate
+# =============================================================================
+# STAGE: prod-euw1 (Prod Account - eu-west-1)
+# =============================================================================
+"prod:iam:plan":
+  extends: .terraform
+  stage: prod-euw1
   variables:
     TF_DIR: aws/prod-euw1/iam
     TF_STATE_NAME: prod-euw1-iam
-  script: [terraform validate]
-
-"prod-euw1/iam/plan":
-  extends: .prod-euw1
-  stage: plan
-  variables:
-    TF_DIR: aws/prod-euw1/iam
-    TF_STATE_NAME: prod-euw1-iam
-  script: [terraform plan -out=tfplan]
+    AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
+  script:
+    - terraform validate
+    - terraform plan -out=tfplan
   artifacts:
     paths: [aws/prod-euw1/iam/tfplan]
     expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: manual
 
-"prod-euw1/iam/apply":
-  extends: .prod-euw1
-  stage: apply
+"prod:iam:apply":
+  extends: .terraform
+  stage: prod-euw1
   variables:
     TF_DIR: aws/prod-euw1/iam
     TF_STATE_NAME: prod-euw1-iam
-  script: [terraform apply -auto-approve tfplan]
-  dependencies: ["prod-euw1/iam/plan"]
+    AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
+  script:
+    - terraform apply -auto-approve tfplan
+  dependencies: ["prod:iam:plan"]
+  needs: ["prod:iam:plan"]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: manual
 
-# EKS
-"prod-euw1/eks/validate":
-  extends: .prod-euw1
-  stage: validate
+"prod:eks:plan":
+  extends: .terraform
+  stage: prod-euw1
   variables:
     TF_DIR: aws/prod-euw1/eks
     TF_STATE_NAME: prod-euw1-eks
-  script: [terraform validate]
-
-"prod-euw1/eks/plan":
-  extends: .prod-euw1
-  stage: plan
-  variables:
-    TF_DIR: aws/prod-euw1/eks
-    TF_STATE_NAME: prod-euw1-eks
-  script: [terraform plan -out=tfplan]
+    AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
+  script:
+    - terraform validate
+    - terraform plan -out=tfplan
   artifacts:
     paths: [aws/prod-euw1/eks/tfplan]
     expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: manual
 
-"prod-euw1/eks/apply":
-  extends: .prod-euw1
-  stage: apply
+"prod:eks:apply":
+  extends: .terraform
+  stage: prod-euw1
   variables:
     TF_DIR: aws/prod-euw1/eks
     TF_STATE_NAME: prod-euw1-eks
-  script: [terraform apply -auto-approve tfplan]
-  dependencies: ["prod-euw1/eks/plan"]
+    AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
+  script:
+    - terraform apply -auto-approve tfplan
+  dependencies: ["prod:eks:plan"]
+  needs: ["prod:eks:plan"]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: manual
 
-"prod-euw1/eks/destroy":
-  extends: .prod-euw1
+# =============================================================================
+# STAGE: destroy (Manual only)
+# =============================================================================
+"dev:eks:destroy":
+  extends: .terraform
+  stage: destroy
+  variables:
+    TF_DIR: aws/dev-euw1/eks
+    TF_STATE_NAME: dev-euw1-eks
+    AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
+  script:
+    - terraform destroy -auto-approve
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: manual
+
+"prod:eks:destroy":
+  extends: .terraform
   stage: destroy
   variables:
     TF_DIR: aws/prod-euw1/eks
     TF_STATE_NAME: prod-euw1-eks
-  script: [terraform destroy -auto-approve]
+    AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
+  script:
+    - terraform destroy -auto-approve
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: manual

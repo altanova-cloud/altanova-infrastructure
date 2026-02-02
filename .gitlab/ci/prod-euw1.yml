@@ -1,0 +1,90 @@
+# =============================================================================
+# Child Pipeline: prod-euw1 (Prod Account - eu-west-1)
+# =============================================================================
+# Resources: IAM, EKS
+# =============================================================================
+
+include:
+  - local: ".gitlab/ci/templates.yml"
+
+stages:
+  - validate
+  - plan
+  - apply
+
+variables:
+  AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
+
+# -----------------------------------------------------------------------------
+# IAM
+# -----------------------------------------------------------------------------
+iam:validate:
+  extends: .terraform
+  stage: validate
+  variables:
+    TF_DIR: aws/prod-euw1/iam
+    TF_STATE_NAME: prod-euw1-iam
+  script:
+    - terraform validate
+    - terraform fmt -check
+
+iam:plan:
+  extends: .terraform
+  stage: plan
+  variables:
+    TF_DIR: aws/prod-euw1/iam
+    TF_STATE_NAME: prod-euw1-iam
+  script:
+    - terraform plan -out=tfplan
+  artifacts:
+    paths: [aws/prod-euw1/iam/tfplan]
+    expire_in: 7 days
+  needs: [iam:validate]
+
+iam:apply:
+  extends: .terraform
+  stage: apply
+  variables:
+    TF_DIR: aws/prod-euw1/iam
+    TF_STATE_NAME: prod-euw1-iam
+  script:
+    - terraform apply -auto-approve tfplan
+  needs: [iam:plan]
+  when: manual
+
+# -----------------------------------------------------------------------------
+# EKS
+# -----------------------------------------------------------------------------
+eks:validate:
+  extends: .terraform
+  stage: validate
+  variables:
+    TF_DIR: aws/prod-euw1/eks
+    TF_STATE_NAME: prod-euw1-eks
+  script:
+    - terraform validate
+    - terraform fmt -check
+
+eks:plan:
+  extends: .terraform
+  stage: plan
+  variables:
+    TF_DIR: aws/prod-euw1/eks
+    TF_STATE_NAME: prod-euw1-eks
+  script:
+    - terraform plan -out=tfplan
+  artifacts:
+    paths: [aws/prod-euw1/eks/tfplan]
+    expire_in: 7 days
+  needs: [eks:validate]
+
+eks:apply:
+  extends: .terraform
+  stage: apply
+  variables:
+    TF_DIR: aws/prod-euw1/eks
+    TF_STATE_NAME: prod-euw1-eks
+  script:
+    - terraform apply -auto-approve tfplan
+  needs: [eks:plan]
+  when: manual

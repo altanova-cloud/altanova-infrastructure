@@ -1,0 +1,41 @@
+# =============================================================================
+# Shared Templates for Child Pipelines
+# =============================================================================
+
+.terraform:
+  image:
+    name: hashicorp/terraform:1.8
+    entrypoint: [""]
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: sts.amazonaws.com
+  variables:
+    GITLAB_TF_ADDRESS: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state"
+  before_script:
+    - |
+      export TF_HTTP_ADDRESS="${GITLAB_TF_ADDRESS}/${TF_STATE_NAME}"
+      export TF_HTTP_LOCK_ADDRESS="${TF_HTTP_ADDRESS}/lock"
+      export TF_HTTP_UNLOCK_ADDRESS="${TF_HTTP_ADDRESS}/lock"
+      export TF_HTTP_USERNAME="gitlab-ci-token"
+      export TF_HTTP_PASSWORD="${CI_JOB_TOKEN}"
+      export TF_HTTP_LOCK_METHOD="POST"
+      export TF_HTTP_UNLOCK_METHOD="DELETE"
+
+      apk add --no-cache aws-cli > /dev/null 2>&1
+
+      CREDENTIALS=$(aws sts assume-role-with-web-identity \
+        --role-arn "${AWS_ROLE_ARN}" \
+        --role-session-name "gitlab-ci-${CI_JOB_ID}" \
+        --web-identity-token "${GITLAB_OIDC_TOKEN}" \
+        --duration-seconds 3600 \
+        --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+        --output text)
+
+      export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | awk '{print $1}')
+      export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | awk '{print $2}')
+      export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | awk '{print $3}')
+    - cd ${TF_DIR}
+    - terraform init
+  retry:
+    max: 2
+    when: [runner_system_failure, stuck_or_timeout_failure]

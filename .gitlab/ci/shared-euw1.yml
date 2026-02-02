@@ -1,0 +1,127 @@
+# =============================================================================
+# Child Pipeline: shared-euw1 (Shared Account - eu-west-1)
+# =============================================================================
+# Resources: VPC, Route53, ECR
+# =============================================================================
+
+include:
+  - local: ".gitlab/ci/templates.yml"
+
+stages:
+  - validate
+  - plan
+  - apply
+
+variables:
+  AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
+
+# -----------------------------------------------------------------------------
+# VPC
+# -----------------------------------------------------------------------------
+vpc:validate:
+  extends: .terraform
+  stage: validate
+  variables:
+    TF_DIR: aws/shared-euw1/vpc
+    TF_STATE_NAME: shared-euw1-vpc
+  script:
+    - terraform validate
+    - terraform fmt -check
+
+vpc:plan:
+  extends: .terraform
+  stage: plan
+  variables:
+    TF_DIR: aws/shared-euw1/vpc
+    TF_STATE_NAME: shared-euw1-vpc
+  script:
+    - terraform plan -out=tfplan
+  artifacts:
+    paths: [aws/shared-euw1/vpc/tfplan]
+    expire_in: 7 days
+  needs: [vpc:validate]
+
+vpc:apply:
+  extends: .terraform
+  stage: apply
+  variables:
+    TF_DIR: aws/shared-euw1/vpc
+    TF_STATE_NAME: shared-euw1-vpc
+  script:
+    - terraform apply -auto-approve tfplan
+  needs: [vpc:plan]
+  when: manual
+
+# -----------------------------------------------------------------------------
+# Route53
+# -----------------------------------------------------------------------------
+route53:validate:
+  extends: .terraform
+  stage: validate
+  variables:
+    TF_DIR: aws/shared-euw1/route53
+    TF_STATE_NAME: shared-euw1-route53
+  script:
+    - terraform validate
+    - terraform fmt -check
+
+route53:plan:
+  extends: .terraform
+  stage: plan
+  variables:
+    TF_DIR: aws/shared-euw1/route53
+    TF_STATE_NAME: shared-euw1-route53
+  script:
+    - terraform plan -out=tfplan
+  artifacts:
+    paths: [aws/shared-euw1/route53/tfplan]
+    expire_in: 7 days
+  needs: [route53:validate]
+
+route53:apply:
+  extends: .terraform
+  stage: apply
+  variables:
+    TF_DIR: aws/shared-euw1/route53
+    TF_STATE_NAME: shared-euw1-route53
+  script:
+    - terraform apply -auto-approve tfplan
+  needs: [route53:plan]
+  when: manual
+
+# -----------------------------------------------------------------------------
+# ECR
+# -----------------------------------------------------------------------------
+ecr:validate:
+  extends: .terraform
+  stage: validate
+  variables:
+    TF_DIR: aws/shared-euw1/ecr
+    TF_STATE_NAME: shared-euw1-ecr
+  script:
+    - terraform validate
+    - terraform fmt -check
+
+ecr:plan:
+  extends: .terraform
+  stage: plan
+  variables:
+    TF_DIR: aws/shared-euw1/ecr
+    TF_STATE_NAME: shared-euw1-ecr
+  script:
+    - terraform plan -out=tfplan
+  artifacts:
+    paths: [aws/shared-euw1/ecr/tfplan]
+    expire_in: 7 days
+  needs: [ecr:validate]
+
+ecr:apply:
+  extends: .terraform
+  stage: apply
+  variables:
+    TF_DIR: aws/shared-euw1/ecr
+    TF_STATE_NAME: shared-euw1-ecr
+  script:
+    - terraform apply -auto-approve tfplan
+  needs: [ecr:plan]
+  when: manual

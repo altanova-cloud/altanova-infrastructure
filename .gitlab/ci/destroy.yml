@@ -1,0 +1,104 @@
+# =============================================================================
+# Destroy Pipeline (Only runs when DESTROY variable is set)
+# =============================================================================
+# Run manually with: CI/CD > Run Pipeline > Add variable: DESTROY = true
+# =============================================================================
+
+include:
+  - local: ".gitlab/ci/templates.yml"
+
+stages:
+  - destroy
+
+# -----------------------------------------------------------------------------
+# Dev EKS Destroy
+# -----------------------------------------------------------------------------
+dev:eks:destroy:
+  extends: .terraform
+  stage: destroy
+  variables:
+    TF_DIR: aws/dev-euw1/eks
+    TF_STATE_NAME: dev-euw1-eks
+    AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
+  script:
+    - echo "⚠️  DESTROYING dev-euw1 EKS cluster..."
+    - terraform destroy -auto-approve
+  when: manual
+
+dev:iam:destroy:
+  extends: .terraform
+  stage: destroy
+  variables:
+    TF_DIR: aws/dev-euw1/iam
+    TF_STATE_NAME: dev-euw1-iam
+    AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
+  script:
+    - echo "⚠️  DESTROYING dev-euw1 IAM..."
+    - terraform destroy -auto-approve
+  when: manual
+
+# -----------------------------------------------------------------------------
+# Prod EKS Destroy
+# -----------------------------------------------------------------------------
+prod:eks:destroy:
+  extends: .terraform
+  stage: destroy
+  variables:
+    TF_DIR: aws/prod-euw1/eks
+    TF_STATE_NAME: prod-euw1-eks
+    AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
+  script:
+    - echo "⚠️  DESTROYING prod-euw1 EKS cluster..."
+    - terraform destroy -auto-approve
+  when: manual
+
+prod:iam:destroy:
+  extends: .terraform
+  stage: destroy
+  variables:
+    TF_DIR: aws/prod-euw1/iam
+    TF_STATE_NAME: prod-euw1-iam
+    AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
+  script:
+    - echo "⚠️  DESTROYING prod-euw1 IAM..."
+    - terraform destroy -auto-approve
+  when: manual
+
+# -----------------------------------------------------------------------------
+# Shared Resources Destroy (Be very careful!)
+# -----------------------------------------------------------------------------
+shared:ecr:destroy:
+  extends: .terraform
+  stage: destroy
+  variables:
+    TF_DIR: aws/shared-euw1/ecr
+    TF_STATE_NAME: shared-euw1-ecr
+    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
+  script:
+    - echo "⚠️  DESTROYING shared-euw1 ECR..."
+    - terraform destroy -auto-approve
+  when: manual
+
+shared:route53:destroy:
+  extends: .terraform
+  stage: destroy
+  variables:
+    TF_DIR: aws/shared-euw1/route53
+    TF_STATE_NAME: shared-euw1-route53
+    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
+  script:
+    - echo "⚠️  DESTROYING shared-euw1 Route53..."
+    - terraform destroy -auto-approve
+  when: manual
+
+shared:vpc:destroy:
+  extends: .terraform
+  stage: destroy
+  variables:
+    TF_DIR: aws/shared-euw1/vpc
+    TF_STATE_NAME: shared-euw1-vpc
+    AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
+  script:
+    - echo "⚠️  DESTROYING shared-euw1 VPC..."
+    - terraform destroy -auto-approve
+  when: manual

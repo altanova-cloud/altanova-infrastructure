@@ -1,0 +1,216 @@
+# =============================================================================
+# EKS - Prod Account (eu-west-1)
+# =============================================================================
+# State: prod-euw1-eks
+# =============================================================================
+
+terraform {
+  required_version = ">= 1.8"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.35"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.17"
+    }
+    kubectl = {
+      source  = "alekc/kubectl"
+      version = "~> 2.0"
+    }
+  }
+
+  backend "http" {}
+}
+
+locals {
+  environment = "prod"
+  region      = "eu-west-1"
+  region_code = "euw1"
+  account_id  = "624755517249"
+
+  # ---------------------------------------------------------------------------
+  # VPC Configuration (from shared VPC)
+  # Update these after deploying shared-euw1/vpc
+  # ---------------------------------------------------------------------------
+  vpc_id             = "REPLACE_WITH_VPC_ID"
+  private_subnet_ids = ["REPLACE_PROD_PRIVATE_A", "REPLACE_PROD_PRIVATE_B"]
+  public_subnet_ids  = ["REPLACE_PROD_PUBLIC_A", "REPLACE_PROD_PUBLIC_B"]
+
+  # ---------------------------------------------------------------------------
+  # EKS Configuration (Production - larger, more reliable)
+  # ---------------------------------------------------------------------------
+  # System nodes
+  system_node_instance_types = ["t3.medium"]
+  system_node_min_size       = 1
+  system_node_max_size       = 3
+  system_node_desired_size   = 2
+  system_node_disk_size      = 100
+
+  # General pool (reliability-focused)
+  default_node_disk_size           = 100
+  general_pool_capacity_types      = ["on-demand", "spot"]
+  general_pool_instance_categories = ["m", "c", "r"]
+  general_pool_instance_sizes      = ["medium", "large", "xlarge"]
+  general_pool_cpu_limit           = 200
+  general_pool_memory_limit        = "400Gi"
+  consolidation_delay              = "10m"
+
+  # GPU pool (larger limits)
+  enable_gpu_nodes        = true
+  gpu_node_disk_size      = 500
+  gpu_pool_capacity_types = ["on-demand", "spot"]
+  gpu_instance_types      = ["g4dn.xlarge", "g4dn.2xlarge", "g4dn.4xlarge"]
+  gpu_pool_cpu_limit      = 64
+  gpu_pool_memory_limit   = "256Gi"
+  gpu_pool_gpu_limit      = 8
+  gpu_consolidation_delay = "15m"
+}
+
+# =============================================================================
+# Providers
+# =============================================================================
+provider "aws" {
+  region = local.region
+
+  default_tags {
+    tags = {
+      Environment = local.environment
+      Region      = local.region
+      ManagedBy   = "Terraform"
+      Project     = "AltaNova"
+    }
+  }
+}
+
+provider "kubernetes" {
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--region", local.region]
+  }
+}
+
+provider "helm" {
+  kubernetes {
+    host                   = module.eks.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--region", local.region]
+    }
+  }
+}
+
+provider "kubectl" {
+  apply_retry_count      = 5
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+  load_config_file       = false
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--region", local.region]
+  }
+}
+
+# =============================================================================
+# EKS Cluster Module
+# =============================================================================
+module "eks" {
+  source = "../../modules/eks-cluster"
+
+  project_name = "altanova"
+  environment  = local.environment
+  region       = local.region
+  region_code  = local.region_code
+
+  # VPC configuration
+  vpc_id             = local.vpc_id
+  private_subnet_ids = local.private_subnet_ids
+  public_subnet_ids  = local.public_subnet_ids
+
+  # Cluster configuration
+  cluster_version                = "1.31"
+  cluster_endpoint_public_access = false
+
+  # System node group
+  system_node_instance_types = local.system_node_instance_types
+  system_node_min_size       = local.system_node_min_size
+  system_node_max_size       = local.system_node_max_size
+  system_node_desired_size   = local.system_node_desired_size
+  system_node_disk_size      = local.system_node_disk_size
+
+  # Karpenter
+  karpenter_version  = "1.0.8"
+  karpenter_replicas = 2
+
+  # General NodePool
+  default_node_disk_size           = local.default_node_disk_size
+  general_pool_capacity_types      = local.general_pool_capacity_types
+  general_pool_instance_categories = local.general_pool_instance_categories
+  general_pool_instance_sizes      = local.general_pool_instance_sizes
+  general_pool_cpu_limit           = local.general_pool_cpu_limit
+  general_pool_memory_limit        = local.general_pool_memory_limit
+  consolidation_delay              = local.consolidation_delay
+  node_expire_after                = "720h"
+
+  # GPU NodePool
+  enable_gpu_nodes        = local.enable_gpu_nodes
+  gpu_node_disk_size      = local.gpu_node_disk_size
+  gpu_pool_capacity_types = local.gpu_pool_capacity_types
+  gpu_instance_types      = local.gpu_instance_types
+  gpu_pool_cpu_limit      = local.gpu_pool_cpu_limit
+  gpu_pool_memory_limit   = local.gpu_pool_memory_limit
+  gpu_pool_gpu_limit      = local.gpu_pool_gpu_limit
+  gpu_consolidation_delay = local.gpu_consolidation_delay
+
+  tags = {
+    Environment = local.environment
+  }
+}
+
+# =============================================================================
+# Outputs
+# =============================================================================
+output "cluster_name" {
+  description = "EKS cluster name"
+  value       = module.eks.cluster_name
+}
+
+output "cluster_endpoint" {
+  description = "EKS cluster endpoint"
+  value       = module.eks.cluster_endpoint
+}
+
+output "cluster_oidc_issuer_url" {
+  description = "OIDC issuer URL"
+  value       = module.eks.cluster_oidc_issuer_url
+}
+
+output "oidc_provider_arn" {
+  description = "OIDC provider ARN"
+  value       = module.eks.oidc_provider_arn
+}
+
+output "configure_kubectl" {
+  description = "Command to configure kubectl"
+  value       = module.eks.configure_kubectl
+}
+
+output "karpenter_iam_role_arn" {
+  description = "Karpenter IAM role ARN"
+  value       = module.eks.karpenter_iam_role_arn
+}

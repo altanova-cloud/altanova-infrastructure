@@ -1,18 +1,7 @@
 # =============================================================================
-# VPC - Workspace-based Shared Network Hub
+# VPC - Shared Account (eu-west-1)
 # =============================================================================
-#
-# Uses Terraform workspaces for environment + region separation.
-#
-# Workspace naming: shared-{region_code}
-#   - shared-euw1  (Shared in eu-west-1)
-#   - shared-eus2  (Shared in eu-south-2 Spain)
-#   - shared-use1  (Shared in us-east-1)
-#
-# Usage:
-#   terraform workspace new shared-euw1
-#   terraform workspace select shared-euw1
-#   terraform plan
+# State: shared-euw1-vpc
 # =============================================================================
 
 terraform {
@@ -28,24 +17,10 @@ terraform {
   backend "http" {}
 }
 
-# =============================================================================
-# Workspace Configuration
-# =============================================================================
 locals {
-  # Parse workspace: "shared-euw1" -> env="shared", region_code="euw1"
-  workspace_parts = split("-", terraform.workspace)
-  environment     = local.workspace_parts[0]
-  region_code     = local.workspace_parts[1]
-
-  # Region mapping
-  region_map = {
-    euw1 = "eu-west-1"
-    euw2 = "eu-west-2"
-    eus2 = "eu-south-2" # Spain
-    use1 = "us-east-1"
-    use2 = "us-east-2"
-  }
-  region = local.region_map[local.region_code]
+  environment = "shared"
+  region      = "eu-west-1"
+  region_code = "euw1"
 
   # Account IDs
   shared_account_id = "265245191272"
@@ -58,9 +33,6 @@ locals {
   single_nat_gateway = true
 }
 
-# =============================================================================
-# Provider
-# =============================================================================
 provider "aws" {
   region = local.region
 
@@ -70,14 +42,10 @@ provider "aws" {
       Region      = local.region
       ManagedBy   = "Terraform"
       Project     = "AltaNova"
-      Workspace   = terraform.workspace
     }
   }
 }
 
-# =============================================================================
-# VPC Module
-# =============================================================================
 module "vpc" {
   source = "../../modules/vpc"
 
@@ -92,28 +60,12 @@ module "vpc" {
 
   tags = {
     Environment = local.environment
-    Workspace   = terraform.workspace
   }
 }
 
 # =============================================================================
 # Outputs
 # =============================================================================
-output "workspace" {
-  description = "Current workspace"
-  value       = terraform.workspace
-}
-
-output "environment" {
-  description = "Environment"
-  value       = local.environment
-}
-
-output "region" {
-  description = "AWS Region"
-  value       = local.region
-}
-
 output "vpc_id" {
   description = "VPC ID"
   value       = module.vpc.vpc_id
@@ -134,11 +86,6 @@ output "dev_private_subnet_ids" {
   value       = module.vpc.dev_private_subnet_ids
 }
 
-output "dev_database_subnet_ids" {
-  description = "Dev database subnet IDs"
-  value       = module.vpc.dev_database_subnet_ids
-}
-
 output "prod_public_subnet_ids" {
   description = "Prod public subnet IDs"
   value       = module.vpc.prod_public_subnet_ids
@@ -147,16 +94,6 @@ output "prod_public_subnet_ids" {
 output "prod_private_subnet_ids" {
   description = "Prod private subnet IDs"
   value       = module.vpc.prod_private_subnet_ids
-}
-
-output "prod_database_subnet_ids" {
-  description = "Prod database subnet IDs"
-  value       = module.vpc.prod_database_subnet_ids
-}
-
-output "database_subnet_group_name" {
-  description = "Database subnet group name"
-  value       = module.vpc.database_subnet_group_name
 }
 
 output "nat_public_ips" {

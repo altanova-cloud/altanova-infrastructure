@@ -1,18 +1,7 @@
 # =============================================================================
-# ECR - Workspace-based Container Registries
+# ECR - Shared Account (eu-west-1)
 # =============================================================================
-#
-# Uses Terraform workspaces for environment + region separation.
-#
-# Workspace naming: shared-{region_code}
-#   - shared-euw1  (Shared in eu-west-1)
-#   - shared-eus2  (Shared in eu-south-2 Spain)
-#   - shared-use1  (Shared in us-east-1)
-#
-# Usage:
-#   terraform workspace new shared-euw1
-#   terraform workspace select shared-euw1
-#   terraform plan
+# State: shared-euw1-ecr
 # =============================================================================
 
 terraform {
@@ -28,24 +17,9 @@ terraform {
   backend "http" {}
 }
 
-# =============================================================================
-# Workspace Configuration
-# =============================================================================
 locals {
-  # Parse workspace: "shared-euw1" -> env="shared", region_code="euw1"
-  workspace_parts = split("-", terraform.workspace)
-  environment     = local.workspace_parts[0]
-  region_code     = local.workspace_parts[1]
-
-  # Region mapping
-  region_map = {
-    euw1 = "eu-west-1"
-    euw2 = "eu-west-2"
-    eus2 = "eu-south-2" # Spain
-    use1 = "us-east-1"
-    use2 = "us-east-2"
-  }
-  region = local.region_map[local.region_code]
+  environment = "shared"
+  region      = "eu-west-1"
 
   # Account IDs
   dev_account_id  = "975050047325"
@@ -59,15 +33,8 @@ locals {
     "tenant-console",
     "audit-logger"
   ]
-
-  ecr_tags = {
-    Purpose = "Container Registry"
-  }
 }
 
-# =============================================================================
-# Provider
-# =============================================================================
 provider "aws" {
   region = local.region
 
@@ -77,7 +44,6 @@ provider "aws" {
       Region      = local.region
       ManagedBy   = "Terraform"
       Project     = "AltaNova"
-      Workspace   = terraform.workspace
     }
   }
 }
@@ -99,9 +65,10 @@ resource "aws_ecr_repository" "services" {
     encryption_type = "AES256"
   }
 
-  tags = merge(local.ecr_tags, {
+  tags = {
+    Purpose = "Container Registry"
     Service = each.value
-  })
+  }
 }
 
 # =============================================================================
@@ -122,9 +89,7 @@ resource "aws_ecr_lifecycle_policy" "services" {
           countType     = "imageCountMoreThan"
           countNumber   = 30
         }
-        action = {
-          type = "expire"
-        }
+        action = { type = "expire" }
       },
       {
         rulePriority = 2
@@ -134,9 +99,7 @@ resource "aws_ecr_lifecycle_policy" "services" {
           countType   = "imageCountMoreThan"
           countNumber = 10
         }
-        action = {
-          type = "expire"
-        }
+        action = { type = "expire" }
       },
       {
         rulePriority = 3
@@ -147,9 +110,7 @@ resource "aws_ecr_lifecycle_policy" "services" {
           countUnit   = "days"
           countNumber = 90
         }
-        action = {
-          type = "expire"
-        }
+        action = { type = "expire" }
       }
     ]
   })
@@ -190,21 +151,6 @@ resource "aws_ecr_repository_policy" "cross_account_pull" {
 # =============================================================================
 # Outputs
 # =============================================================================
-output "workspace" {
-  description = "Current workspace"
-  value       = terraform.workspace
-}
-
-output "environment" {
-  description = "Environment"
-  value       = local.environment
-}
-
-output "region" {
-  description = "AWS Region"
-  value       = local.region
-}
-
 output "ecr_repository_urls" {
   description = "Map of ECR repository URLs"
   value       = { for k, v in aws_ecr_repository.services : k => v.repository_url }

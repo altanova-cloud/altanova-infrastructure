@@ -2,13 +2,15 @@
 # GitLab CI/CD Pipeline for Terraform Infrastructure
 # =============================================================================
 #
-# Uses parallel:matrix for scalability and grouped job names for clean UI.
+# Folder-based structure (no workspaces):
+#   aws/shared-euw1/vpc    → State: shared-euw1-vpc
+#   aws/dev-euw1/eks       → State: dev-euw1-eks
+#   aws/prod-euw1/iam      → State: prod-euw1-iam
 #
-# Job naming: {workspace}/{component}/{action}
-#   - shared-euw1/vpc/plan
-#   - dev-euw1/eks/apply
-#
-# To add a new region, just add to the matrix arrays below.
+# To add a new region:
+#   1. Copy folder (e.g., cp -r aws/dev-euw1 aws/dev-eus2)
+#   2. Update region in main.tf
+#   3. Add CI jobs below
 # =============================================================================
 
 stages:
@@ -59,246 +61,205 @@ variables:
       export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | awk '{print $3}')
     - cd ${TF_DIR}
     - terraform init
-    - terraform workspace select ${TF_WORKSPACE} || terraform workspace new ${TF_WORKSPACE}
   retry:
     max: 2
     when: [runner_system_failure, stuck_or_timeout_failure]
 
 # =============================================================================
-# SHARED ACCOUNT - VPC, Route53, ECR
+# SHARED-EUW1 (Shared Account - eu-west-1)
 # =============================================================================
-.shared:
+.shared-euw1:
   extends: .terraform
   variables:
     AWS_ROLE_ARN: "arn:aws:iam::265245191272:role/GitLabRunnerRole"
   rules:
     - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
 
-"shared/vpc/validate":
-  extends: .shared
+# VPC
+"shared-euw1/vpc/validate":
+  extends: .shared-euw1
   stage: validate
   variables:
-    TF_DIR: aws/shared/vpc
-    TF_STATE_NAME: vpc
-    TF_WORKSPACE: shared-euw1
-  script:
-    - terraform validate
+    TF_DIR: aws/shared-euw1/vpc
+    TF_STATE_NAME: shared-euw1-vpc
+  script: [terraform validate]
 
-"shared/vpc/plan":
-  extends: .shared
+"shared-euw1/vpc/plan":
+  extends: .shared-euw1
   stage: plan
   variables:
-    TF_DIR: aws/shared/vpc
-    TF_STATE_NAME: vpc
-    TF_WORKSPACE: shared-euw1
-  script:
-    - terraform plan -out=tfplan
+    TF_DIR: aws/shared-euw1/vpc
+    TF_STATE_NAME: shared-euw1-vpc
+  script: [terraform plan -out=tfplan]
   artifacts:
-    paths: [aws/shared/vpc/tfplan]
+    paths: [aws/shared-euw1/vpc/tfplan]
     expire_in: 7 days
 
-"shared/vpc/apply":
-  extends: .shared
+"shared-euw1/vpc/apply":
+  extends: .shared-euw1
   stage: apply
   variables:
-    TF_DIR: aws/shared/vpc
-    TF_STATE_NAME: vpc
-    TF_WORKSPACE: shared-euw1
-  script:
-    - terraform apply -auto-approve tfplan
-  dependencies: ["shared/vpc/plan"]
+    TF_DIR: aws/shared-euw1/vpc
+    TF_STATE_NAME: shared-euw1-vpc
+  script: [terraform apply -auto-approve tfplan]
+  dependencies: ["shared-euw1/vpc/plan"]
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
       when: manual
 
-"shared/route53/validate":
-  extends: .shared
+# Route53
+"shared-euw1/route53/validate":
+  extends: .shared-euw1
   stage: validate
   variables:
-    TF_DIR: aws/shared/route53
-    TF_STATE_NAME: route53
-    TF_WORKSPACE: shared-euw1
-  script:
-    - terraform validate
+    TF_DIR: aws/shared-euw1/route53
+    TF_STATE_NAME: shared-euw1-route53
+  script: [terraform validate]
 
-"shared/route53/plan":
-  extends: .shared
+"shared-euw1/route53/plan":
+  extends: .shared-euw1
   stage: plan
   variables:
-    TF_DIR: aws/shared/route53
-    TF_STATE_NAME: route53
-    TF_WORKSPACE: shared-euw1
-  script:
-    - terraform plan -out=tfplan
+    TF_DIR: aws/shared-euw1/route53
+    TF_STATE_NAME: shared-euw1-route53
+  script: [terraform plan -out=tfplan]
   artifacts:
-    paths: [aws/shared/route53/tfplan]
+    paths: [aws/shared-euw1/route53/tfplan]
     expire_in: 7 days
 
-"shared/route53/apply":
-  extends: .shared
+"shared-euw1/route53/apply":
+  extends: .shared-euw1
   stage: apply
   variables:
-    TF_DIR: aws/shared/route53
-    TF_STATE_NAME: route53
-    TF_WORKSPACE: shared-euw1
-  script:
-    - terraform apply -auto-approve tfplan
-  dependencies: ["shared/route53/plan"]
+    TF_DIR: aws/shared-euw1/route53
+    TF_STATE_NAME: shared-euw1-route53
+  script: [terraform apply -auto-approve tfplan]
+  dependencies: ["shared-euw1/route53/plan"]
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
       when: manual
 
-"shared/ecr/validate":
-  extends: .shared
+# ECR
+"shared-euw1/ecr/validate":
+  extends: .shared-euw1
   stage: validate
   variables:
-    TF_DIR: aws/shared/ecr
-    TF_STATE_NAME: ecr
-    TF_WORKSPACE: shared-euw1
-  script:
-    - terraform validate
+    TF_DIR: aws/shared-euw1/ecr
+    TF_STATE_NAME: shared-euw1-ecr
+  script: [terraform validate]
 
-"shared/ecr/plan":
-  extends: .shared
+"shared-euw1/ecr/plan":
+  extends: .shared-euw1
   stage: plan
   variables:
-    TF_DIR: aws/shared/ecr
-    TF_STATE_NAME: ecr
-    TF_WORKSPACE: shared-euw1
-  script:
-    - terraform plan -out=tfplan
+    TF_DIR: aws/shared-euw1/ecr
+    TF_STATE_NAME: shared-euw1-ecr
+  script: [terraform plan -out=tfplan]
   artifacts:
-    paths: [aws/shared/ecr/tfplan]
+    paths: [aws/shared-euw1/ecr/tfplan]
     expire_in: 7 days
 
-"shared/ecr/apply":
-  extends: .shared
+"shared-euw1/ecr/apply":
+  extends: .shared-euw1
   stage: apply
   variables:
-    TF_DIR: aws/shared/ecr
-    TF_STATE_NAME: ecr
-    TF_WORKSPACE: shared-euw1
-  script:
-    - terraform apply -auto-approve tfplan
-  dependencies: ["shared/ecr/plan"]
+    TF_DIR: aws/shared-euw1/ecr
+    TF_STATE_NAME: shared-euw1-ecr
+  script: [terraform apply -auto-approve tfplan]
+  dependencies: ["shared-euw1/ecr/plan"]
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
       when: manual
 
 # =============================================================================
-# DEV ACCOUNT - IAM & EKS (Matrix for future regions)
+# DEV-EUW1 (Dev Account - eu-west-1)
 # =============================================================================
-.dev:
+.dev-euw1:
   extends: .terraform
   variables:
     AWS_ROLE_ARN: "arn:aws:iam::975050047325:role/DevDeployRole"
   rules:
     - if: $CI_COMMIT_BRANCH == "master" || $CI_PIPELINE_SOURCE == "merge_request_event"
 
-"dev/iam/validate":
-  extends: .dev
+# IAM
+"dev-euw1/iam/validate":
+  extends: .dev-euw1
   stage: validate
-  parallel:
-    matrix:
-      - TF_WORKSPACE: [dev-euw1]
-        # Future: dev-eus2, dev-use1
   variables:
-    TF_DIR: aws/iam
-    TF_STATE_NAME: iam
-  script:
-    - terraform validate
+    TF_DIR: aws/dev-euw1/iam
+    TF_STATE_NAME: dev-euw1-iam
+  script: [terraform validate]
 
-"dev/iam/plan":
-  extends: .dev
+"dev-euw1/iam/plan":
+  extends: .dev-euw1
   stage: plan
-  parallel:
-    matrix:
-      - TF_WORKSPACE: [dev-euw1]
   variables:
-    TF_DIR: aws/iam
-    TF_STATE_NAME: iam
-  script:
-    - terraform plan -out=tfplan-${TF_WORKSPACE}
+    TF_DIR: aws/dev-euw1/iam
+    TF_STATE_NAME: dev-euw1-iam
+  script: [terraform plan -out=tfplan]
   artifacts:
-    paths: [aws/iam/tfplan-*]
+    paths: [aws/dev-euw1/iam/tfplan]
     expire_in: 7 days
 
-"dev/iam/apply":
-  extends: .dev
+"dev-euw1/iam/apply":
+  extends: .dev-euw1
   stage: apply
-  parallel:
-    matrix:
-      - TF_WORKSPACE: [dev-euw1]
   variables:
-    TF_DIR: aws/iam
-    TF_STATE_NAME: iam
-  script:
-    - terraform apply -auto-approve tfplan-${TF_WORKSPACE}
+    TF_DIR: aws/dev-euw1/iam
+    TF_STATE_NAME: dev-euw1-iam
+  script: [terraform apply -auto-approve tfplan]
+  dependencies: ["dev-euw1/iam/plan"]
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
       when: manual
 
-"dev/eks/validate":
-  extends: .dev
+# EKS
+"dev-euw1/eks/validate":
+  extends: .dev-euw1
   stage: validate
-  parallel:
-    matrix:
-      - TF_WORKSPACE: [dev-euw1]
   variables:
-    TF_DIR: aws/eks
-    TF_STATE_NAME: eks
-  script:
-    - terraform validate
+    TF_DIR: aws/dev-euw1/eks
+    TF_STATE_NAME: dev-euw1-eks
+  script: [terraform validate]
 
-"dev/eks/plan":
-  extends: .dev
+"dev-euw1/eks/plan":
+  extends: .dev-euw1
   stage: plan
-  parallel:
-    matrix:
-      - TF_WORKSPACE: [dev-euw1]
   variables:
-    TF_DIR: aws/eks
-    TF_STATE_NAME: eks
-  script:
-    - terraform plan -out=tfplan-${TF_WORKSPACE}
+    TF_DIR: aws/dev-euw1/eks
+    TF_STATE_NAME: dev-euw1-eks
+  script: [terraform plan -out=tfplan]
   artifacts:
-    paths: [aws/eks/tfplan-*]
+    paths: [aws/dev-euw1/eks/tfplan]
     expire_in: 7 days
 
-"dev/eks/apply":
-  extends: .dev
+"dev-euw1/eks/apply":
+  extends: .dev-euw1
   stage: apply
-  parallel:
-    matrix:
-      - TF_WORKSPACE: [dev-euw1]
   variables:
-    TF_DIR: aws/eks
-    TF_STATE_NAME: eks
-  script:
-    - terraform apply -auto-approve tfplan-${TF_WORKSPACE}
+    TF_DIR: aws/dev-euw1/eks
+    TF_STATE_NAME: dev-euw1-eks
+  script: [terraform apply -auto-approve tfplan]
+  dependencies: ["dev-euw1/eks/plan"]
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
       when: manual
 
-"dev/eks/destroy":
-  extends: .dev
+"dev-euw1/eks/destroy":
+  extends: .dev-euw1
   stage: destroy
-  parallel:
-    matrix:
-      - TF_WORKSPACE: [dev-euw1]
   variables:
-    TF_DIR: aws/eks
-    TF_STATE_NAME: eks
-  script:
-    - terraform destroy -auto-approve
+    TF_DIR: aws/dev-euw1/eks
+    TF_STATE_NAME: dev-euw1-eks
+  script: [terraform destroy -auto-approve]
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
       when: manual
 
 # =============================================================================
-# PROD ACCOUNT - IAM & EKS
+# PROD-EUW1 (Prod Account - eu-west-1)
 # =============================================================================
-.prod:
+.prod-euw1:
   extends: .terraform
   variables:
     AWS_ROLE_ARN: "arn:aws:iam::624755517249:role/ProdDeployRole"
@@ -306,92 +267,68 @@ variables:
     - if: $CI_COMMIT_BRANCH == "master"
       when: manual
 
-"prod/iam/validate":
-  extends: .prod
+# IAM
+"prod-euw1/iam/validate":
+  extends: .prod-euw1
   stage: validate
-  parallel:
-    matrix:
-      - TF_WORKSPACE: [prod-euw1]
   variables:
-    TF_DIR: aws/iam
-    TF_STATE_NAME: iam
-  script:
-    - terraform validate
+    TF_DIR: aws/prod-euw1/iam
+    TF_STATE_NAME: prod-euw1-iam
+  script: [terraform validate]
 
-"prod/iam/plan":
-  extends: .prod
+"prod-euw1/iam/plan":
+  extends: .prod-euw1
   stage: plan
-  parallel:
-    matrix:
-      - TF_WORKSPACE: [prod-euw1]
   variables:
-    TF_DIR: aws/iam
-    TF_STATE_NAME: iam
-  script:
-    - terraform plan -out=tfplan-${TF_WORKSPACE}
+    TF_DIR: aws/prod-euw1/iam
+    TF_STATE_NAME: prod-euw1-iam
+  script: [terraform plan -out=tfplan]
   artifacts:
-    paths: [aws/iam/tfplan-*]
+    paths: [aws/prod-euw1/iam/tfplan]
     expire_in: 7 days
 
-"prod/iam/apply":
-  extends: .prod
+"prod-euw1/iam/apply":
+  extends: .prod-euw1
   stage: apply
-  parallel:
-    matrix:
-      - TF_WORKSPACE: [prod-euw1]
   variables:
-    TF_DIR: aws/iam
-    TF_STATE_NAME: iam
-  script:
-    - terraform apply -auto-approve tfplan-${TF_WORKSPACE}
+    TF_DIR: aws/prod-euw1/iam
+    TF_STATE_NAME: prod-euw1-iam
+  script: [terraform apply -auto-approve tfplan]
+  dependencies: ["prod-euw1/iam/plan"]
 
-"prod/eks/validate":
-  extends: .prod
+# EKS
+"prod-euw1/eks/validate":
+  extends: .prod-euw1
   stage: validate
-  parallel:
-    matrix:
-      - TF_WORKSPACE: [prod-euw1]
   variables:
-    TF_DIR: aws/eks
-    TF_STATE_NAME: eks
-  script:
-    - terraform validate
+    TF_DIR: aws/prod-euw1/eks
+    TF_STATE_NAME: prod-euw1-eks
+  script: [terraform validate]
 
-"prod/eks/plan":
-  extends: .prod
+"prod-euw1/eks/plan":
+  extends: .prod-euw1
   stage: plan
-  parallel:
-    matrix:
-      - TF_WORKSPACE: [prod-euw1]
   variables:
-    TF_DIR: aws/eks
-    TF_STATE_NAME: eks
-  script:
-    - terraform plan -out=tfplan-${TF_WORKSPACE}
+    TF_DIR: aws/prod-euw1/eks
+    TF_STATE_NAME: prod-euw1-eks
+  script: [terraform plan -out=tfplan]
   artifacts:
-    paths: [aws/eks/tfplan-*]
+    paths: [aws/prod-euw1/eks/tfplan]
     expire_in: 7 days
 
-"prod/eks/apply":
-  extends: .prod
+"prod-euw1/eks/apply":
+  extends: .prod-euw1
   stage: apply
-  parallel:
-    matrix:
-      - TF_WORKSPACE: [prod-euw1]
   variables:
-    TF_DIR: aws/eks
-    TF_STATE_NAME: eks
-  script:
-    - terraform apply -auto-approve tfplan-${TF_WORKSPACE}
+    TF_DIR: aws/prod-euw1/eks
+    TF_STATE_NAME: prod-euw1-eks
+  script: [terraform apply -auto-approve tfplan]
+  dependencies: ["prod-euw1/eks/plan"]
 
-"prod/eks/destroy":
-  extends: .prod
+"prod-euw1/eks/destroy":
+  extends: .prod-euw1
   stage: destroy
-  parallel:
-    matrix:
-      - TF_WORKSPACE: [prod-euw1]
   variables:
-    TF_DIR: aws/eks
-    TF_STATE_NAME: eks
-  script:
-    - terraform destroy -auto-approve
+    TF_DIR: aws/prod-euw1/eks
+    TF_STATE_NAME: prod-euw1-eks
+  script: [terraform destroy -auto-approve]
